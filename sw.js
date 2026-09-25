@@ -1,7 +1,7 @@
 // Service Worker
 // キャッシュバスティングのため、更新時はCACHE_VERSIONを変える
 
-const CACHE_VERSION = 'v2'; // ← 更新時はここを v3, v4 と上げる
+const CACHE_VERSION = 'v5'; // ← 更新時はここを v3, v4 と上げる
 const CACHE_NAME = `kakeibo-${CACHE_VERSION}`;
 
 const urlsToCache = [
@@ -10,6 +10,7 @@ const urlsToCache = [
   'manifest.json',
   'css/style.css',
   'js/db.js',
+  'js/holidays.js',
   'js/app.js',
   'icons/apple-touch-icon.png',
   'icons/web-app-manifest-192x192.png',

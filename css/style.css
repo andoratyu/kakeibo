@@ -1,71 +1,392 @@
 /* リセット */
 * {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-  margin: 0;
-  padding: 0;
   background-color: #ffffff;
   color: #333333;
   -webkit-tap-highlight-color: transparent;
   line-height: 1.5;
+  padding-bottom: 64px; /* タブナビの分 */
 }
 
-/* ヘッダー */
+/* ページ全体 */
+.page {
+  display: none;
+  min-height: 100vh;
+}
+
+.page.active {
+  display: block;
+}
+
 header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   padding: 16px 20px;
   border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-}
-
-h1 {
+header h1 {
   font-size: 20px;
-  margin: 0;
+  font-weight: bold;
 }
 
-/* メインコンテンツ */
-main {
-  padding: 20px;
-  max-width: 600px;
-  margin: 0 auto;
+.page-content {
+  padding: 16px;
 }
 
-h2 {
+.placeholder {
+  text-align: center;
+  color: #999999;
+  padding: 40px 20px;
+}
+
+/* 月ナビ */
+.month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.nav-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px 12px;
+  color: #333333;
+}
+
+.nav-btn:hover {
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+
+#current-month {
   font-size: 18px;
-  margin: 24px 0 12px;
+  font-weight: bold;
+  min-width: 140px;
+  text-align: center;
+}
+
+/* カレンダー */
+#calendar-container {
+  width: 100%;
+}
+
+.calendar-header,
+.calendar-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-header {
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 4px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  padding: 8px 0;
+  font-weight: bold;
+}
+
+.calendar-weekday.sunday {
+  color: #cc0000;
+}
+
+.calendar-weekday.saturday {
+  color: #0066cc;
+}
+
+.calendar-cell {
+  border: 1px solid #f0f0f0;
+  min-height: 60px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.1s;
+}
+
+.calendar-cell:hover {
+  background-color: #f8f8f8;
+}
+
+.calendar-cell.other-month {
+  background-color: #fafafa;
+  color: #cccccc;
+  cursor: default;
+}
+
+.calendar-cell.other-month:hover {
+  background-color: #fafafa;
+}
+
+.calendar-cell.today {
+  background-color: #fff8dc;
+  border-color: #333333;
+  border-width: 2px;
+}
+
+.cell-date {
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.cell-date.sunday,
+.cell-date.holiday {
+  color: #cc0000;
+}
+
+.cell-date.saturday {
+  color: #0066cc;
+}
+
+.cell-amount {
+  font-size: 10px;
+  color: #666666;
+  margin-top: auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month-total {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 16px;
+}
+
+#month-total-amount {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+/* タブナビ */
+#tab-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  height: 64px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+  z-index: 100;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #999999;
+  padding: 8px 0;
+}
+
+.tab-btn.active {
+  color: #333333;
+}
+
+.tab-icon {
+  font-size: 20px;
+}
+
+.tab-label {
+  font-size: 11px;
+}
+
+/* モーダル */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+}
+
+.modal.active {
+  display: block;
+}
+
+.modal-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: #ffffff;
+  border-radius: 16px 16px 0 0;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.modal-header {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-header h2 {
+  font-size: 16px;
+  flex: 1;
+  text-align: center;
+}
+
+.modal-close,
+.back-btn,
+.save-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #333333;
+  padding: 4px 8px;
+}
+
+.save-btn {
+  color: #0066cc;
+  font-weight: bold;
+}
+
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 14px;
+  background-color: #333333;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background-color: #555555;
+}
+
+/* 記録カード（モーダル内） */
+.record-card {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.record-card:hover {
+  background-color: #f8f8f8;
+}
+
+.record-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-category {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.record-memo {
+  font-size: 12px;
+  color: #666666;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-amount {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.empty-message {
+  text-align: center;
+  color: #999999;
+  padding: 32px 16px;
 }
 
 /* 入力フォーム */
-.input-section form {
+#transaction-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   font-size: 14px;
   color: #666666;
+  position: relative;
 }
 
-input, select, button {
-  font-size: 16px; /* iOSでズーム防止するため16px以上 */
-  padding: 10px 12px;
+input, select {
+  font-size: 16px; /* iOSでズーム防止 */
+  padding: 12px;
   border: 1px solid #cccccc;
   border-radius: 6px;
   font-family: inherit;
+  background: #ffffff;
+  color: #333333;
 }
 
 input:focus, select:focus {
@@ -73,87 +394,48 @@ input:focus, select:focus {
   border-color: #333333;
 }
 
-button[type="submit"] {
-  background-color: #333333;
-  color: #ffffff;
-  border: none;
-  cursor: pointer;
-  padding: 12px;
-  font-weight: bold;
-}
-
-button[type="submit"]:hover {
-  background-color: #555555;
-}
-
-/* 一覧 */
-#total-display {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 12px 0;
-}
-
-#transaction-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-
-.transaction-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  border-bottom: 1px solid #e0e0e0;
-  gap: 12px;
-}
-
-.transaction-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.transaction-date {
-  font-size: 12px;
-  color: #999999;
-}
-
-.transaction-category {
+.unit {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
   font-size: 14px;
-  font-weight: bold;
-}
-
-.transaction-memo {
-  font-size: 12px;
   color: #666666;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  pointer-events: none;
 }
 
-.transaction-amount {
-  font-size: 16px;
-  font-weight: bold;
-  white-space: nowrap;
+#amount-input {
+  padding-right: 30px;
 }
 
 .delete-btn {
+  width: 100%;
+  padding: 12px;
   background: none;
-  border: none;
   color: #cc0000;
+  border: 1px solid #cc0000;
+  border-radius: 8px;
   font-size: 14px;
   cursor: pointer;
-  padding: 4px 8px;
+  margin-top: 24px;
 }
 
 .delete-btn:hover {
   background-color: #ffeeee;
-  border-radius: 4px;
 }
 
-/* 空状態 */
-.empty-message {
-  text-align: center;
-  color: #999999;
-  padding: 40px 20px;
+.today-btn {
+  background: none;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 10px;
+  color: #333333;
+  font-family: inherit;
+  margin-left: 12px;
+}
+
+.today-btn:hover {
+  background-color: #333333;
+  color: #ffffff;
 }

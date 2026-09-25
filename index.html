@@ -20,45 +20,113 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header>
-    <img class="icon" src="icons/apple-touch-icon.png" alt="家計簿">
-    <h1>家計簿</h1>
-  </header>
+  <!-- ホーム画面 -->
+  <section id="page-home" class="page">
+    <header>
+      <h1>ホーム</h1>
+    </header>
+    <div class="page-content">
+      <p class="placeholder">円グラフはフェーズ4で実装します</p>
+    </div>
+  </section>
 
-  <main>
-    <!-- 入力フォーム -->
-    <section class="input-section">
-      <h2>支出を記録</h2>
-      <form id="transaction-form">
-        <label>
-          日付
-          <input type="date" id="date-input" required>
-        </label>
-        <label>
-          カテゴリ
-          <select id="category-select" required></select>
-        </label>
-        <label>
-          金額
-          <input type="number" id="amount-input" min="1" max="99999999" required placeholder="1000">
-        </label>
-        <label>
-          メモ
-          <input type="text" id="memo-input" placeholder="任意">
-        </label>
-        <button type="submit">記録する</button>
-      </form>
-    </section>
+  <!-- カレンダー画面 -->
+  <section id="page-calendar" class="page active">
+    <header>
+        <div class="month-nav">
+            <button id="prev-month" class="nav-btn">◀</button>
+            <span id="current-month">2026年9月</span>
+            <button id="next-month" class="nav-btn">▶</button>
+            <button id="today-btn" class="today-btn">今日</button>
+        </div>
+    </header>
+    <div class="page-content">
+      <div id="calendar-container"></div>
+      <div class="month-total">
+        今月合計: <span id="month-total-amount">¥0</span>
+      </div>
+    </div>
+  </section>
 
-    <!-- 一覧表示 -->
-    <section class="list-section">
-      <h2>記録一覧</h2>
-      <p id="total-display">合計: ¥0</p>
-      <ul id="transaction-list"></ul>
-    </section>
-  </main>
+  <!-- 設定画面 -->
+  <section id="page-settings" class="page">
+    <header>
+      <h1>設定</h1>
+    </header>
+    <div class="page-content">
+      <p class="placeholder">設定機能はフェーズ5で実装します</p>
+    </div>
+  </section>
+
+  <!-- 下部タブナビゲーション -->
+  <nav id="tab-nav">
+    <button class="tab-btn" data-page="home">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">ホーム</span>
+    </button>
+    <button class="tab-btn active" data-page="calendar">
+      <span class="tab-icon">📅</span>
+      <span class="tab-label">カレンダー</span>
+    </button>
+    <button class="tab-btn" data-page="settings">
+      <span class="tab-icon">⚙</span>
+      <span class="tab-label">設定</span>
+    </button>
+  </nav>
+
+  <!-- 日付モーダル -->
+  <div id="date-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-date-title">9月18日（水）</h2>
+        <button id="modal-close" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+        <!-- JS で描画 -->
+      </div>
+      <div class="modal-footer">
+        <button id="add-transaction-btn" class="primary-btn">+ 新規追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 入力フォームモーダル -->
+  <div id="form-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <button id="form-back-btn" class="back-btn">◀ 戻る</button>
+        <h2 id="form-title">新規追加</h2>
+        <button type="button" id="form-save-btn" class="save-btn">保存</button>
+      </div>
+      <div class="modal-body">
+        <form id="transaction-form">
+          <label>
+            日付
+            <input type="date" id="date-input" required>
+          </label>
+          <label>
+            カテゴリ
+            <select id="category-select" required></select>
+          </label>
+          <label>
+            金額
+            <input type="number" id="amount-input" min="1" max="99999999" required inputmode="numeric" placeholder="0">
+            <span class="unit">円</span>
+          </label>
+          <label>
+            メモ
+            <input type="text" id="memo-input" placeholder="任意">
+          </label>
+        </form>
+        <button type="button" id="form-delete-btn" class="delete-btn" style="display:none;">削除</button>
+      </div>
+    </div>
+  </div>
 
   <script src="js/db.js"></script>
+  <script src="js/holidays.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
