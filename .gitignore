@@ -1,0 +1,23 @@
+# システムファイル
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ関連
+.vscode/
+.idea/
+
+# 一時ファイル
+*.log
+*.tmp
+*.bak
+*~
+
+# Python関連（もし将来Python混ぜるなら）
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# 元画像とかバックアップ
+icon-source.jpg
