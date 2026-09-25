@@ -1,0 +1,159 @@
+/* リセット */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #ffffff;
+  color: #333333;
+  -webkit-tap-highlight-color: transparent;
+  line-height: 1.5;
+}
+
+/* ヘッダー */
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+/* メインコンテンツ */
+main {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 24px 0 12px;
+}
+
+/* 入力フォーム */
+.input-section form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #666666;
+}
+
+input, select, button {
+  font-size: 16px; /* iOSでズーム防止するため16px以上 */
+  padding: 10px 12px;
+  border: 1px solid #cccccc;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+input:focus, select:focus {
+  outline: none;
+  border-color: #333333;
+}
+
+button[type="submit"] {
+  background-color: #333333;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  padding: 12px;
+  font-weight: bold;
+}
+
+button[type="submit"]:hover {
+  background-color: #555555;
+}
+
+/* 一覧 */
+#total-display {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 12px 0;
+}
+
+#transaction-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.transaction-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  gap: 12px;
+}
+
+.transaction-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.transaction-date {
+  font-size: 12px;
+  color: #999999;
+}
+
+.transaction-category {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.transaction-memo {
+  font-size: 12px;
+  color: #666666;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transaction-amount {
+  font-size: 16px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  color: #cc0000;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.delete-btn:hover {
+  background-color: #ffeeee;
+  border-radius: 4px;
+}
+
+/* 空状態 */
+.empty-message {
+  text-align: center;
+  color: #999999;
+  padding: 40px 20px;
+}

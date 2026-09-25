@@ -17,72 +17,48 @@
   <link rel="icon" type="image/svg+xml" href="icons/favicon.svg">
   <link rel="icon" type="image/png" sizes="96x96" href="icons/favicon-96x96.png">
 
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #ffffff;
-      color: #333333;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      -webkit-tap-highlight-color: transparent;
-    }
-    h1 {
-      font-size: 32px;
-      margin: 20px 0 10px;
-    }
-    p {
-      font-size: 16px;
-      color: #666666;
-      margin: 5px 0;
-    }
-    .icon {
-      width: 120px;
-      height: 120px;
-      border-radius: 24px;
-    }
-  </style>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <img class="icon" src="icons/apple-touch-icon.png" alt="家計簿">
-  <h1>Hello 家計簿</h1>
-  <p>PWA起動成功！</p>
-  <p id="status">Service Worker 登録中...</p>
-  <p id="db-status">DB接続中...</p>
+  <header>
+    <img class="icon" src="icons/apple-touch-icon.png" alt="家計簿">
+    <h1>家計簿</h1>
+  </header>
+
+  <main>
+    <!-- 入力フォーム -->
+    <section class="input-section">
+      <h2>支出を記録</h2>
+      <form id="transaction-form">
+        <label>
+          日付
+          <input type="date" id="date-input" required>
+        </label>
+        <label>
+          カテゴリ
+          <select id="category-select" required></select>
+        </label>
+        <label>
+          金額
+          <input type="number" id="amount-input" min="1" max="99999999" required placeholder="1000">
+        </label>
+        <label>
+          メモ
+          <input type="text" id="memo-input" placeholder="任意">
+        </label>
+        <button type="submit">記録する</button>
+      </form>
+    </section>
+
+    <!-- 一覧表示 -->
+    <section class="list-section">
+      <h2>記録一覧</h2>
+      <p id="total-display">合計: ¥0</p>
+      <ul id="transaction-list"></ul>
+    </section>
+  </main>
 
   <script src="js/db.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js')
-        .then(registration => {
-          console.log('Service Worker 登録成功:', registration.scope);
-          document.getElementById('status').textContent = 'Service Worker 登録成功！';
-        })
-        .catch(error => {
-          console.log('Service Worker 登録失敗:', error);
-          document.getElementById('status').textContent = 'Service Worker 登録失敗（開発中は問題なし）';
-        });
-    } else {
-      document.getElementById('status').textContent = 'このブラウザは Service Worker 非対応';
-    }
-
-    (async () => {
-      try {
-        await KakeiboDB.initDefaultCategories();
-        const cats = await KakeiboDB.getAllCategories();
-        console.log('カテゴリ一覧:', cats);
-
-        const statusEl = document.getElementById('db-status');
-        statusEl.textContent = 'DB接続成功！カテゴリ数: ' + cats.length;
-      } catch (err) {
-        console.error('DB接続エラー:', err);
-        document.getElementById('db-status').textContent = 'DB接続エラー: ' + err.message;
-      }
-    })();
-  </script>
+  <script src="js/app.js"></script>
 </body>
 </html>
