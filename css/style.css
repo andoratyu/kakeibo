@@ -53,13 +53,29 @@ header h1 {
   padding: 32px 16px;
 }
 
-/* 月ナビ */
+/* 月ナビ（3列グリッドで月表示を確実に中央に） */
 .month-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.month-nav-left {
+  /* 左側は空（将来のボタン用スペース） */
+}
+
+.month-nav-center {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  width: 100%;
+  gap: 12px;
+}
+
+.month-nav-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .nav-btn {
@@ -79,7 +95,7 @@ header h1 {
 #current-month, #home-current-month {
   font-size: 18px;
   font-weight: bold;
-  min-width: 140px;
+  min-width: 120px;
   text-align: center;
 }
 
@@ -92,6 +108,7 @@ header h1 {
   padding: 4px 10px;
   color: #333333;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .today-btn:hover {
@@ -103,7 +120,7 @@ header h1 {
 
 .home-total {
   text-align: center;
-  padding: 24px 16px 16px;
+  padding: 24px 16px 8px;
 }
 
 .home-total-amount {
@@ -115,9 +132,15 @@ header h1 {
 .chart-container {
   position: relative;
   width: 100%;
-  max-width: 480px;
+  max-width: 500px;
   margin: 0 auto;
-  padding: 40px 60px;
+  padding: 8px;
+  aspect-ratio: 1 / 1;
+}
+
+#home-chart {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ─── カレンダー ─── */
@@ -154,12 +177,13 @@ header h1 {
 
 .calendar-cell {
   border: 1px solid #f0f0f0;
-  min-height: 70px;
-  padding: 4px;
+  min-height: 80px;
+  padding: 6px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   transition: background-color 0.1s;
+  overflow: hidden;
 }
 
 .calendar-cell:hover {
@@ -183,7 +207,7 @@ header h1 {
 }
 
 .cell-date {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
 }
 
@@ -197,9 +221,9 @@ header h1 {
 }
 
 .cell-amount {
-  font-size: 13px;
+  font-size: 15px;
   color: #333333;
-  font-weight: 500;
+  font-weight: bold;
   margin-top: auto;
   text-align: right;
   overflow: hidden;

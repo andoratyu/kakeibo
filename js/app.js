@@ -57,21 +57,6 @@ function getMonthRange(year, month) {
   return { startDate, endDate, lastDay };
 }
 
-/**
- * 金額を短縮表示（カレンダーマス用）
- * 1000以上は「1.2k」形式、1万以上は「1.2万」
- */
-function formatCompactAmount(amount) {
-  if (amount >= 10000) {
-    const val = amount / 10000;
-    return val >= 10 ? `${Math.floor(val)}万` : `${val.toFixed(1)}万`;
-  }
-  if (amount >= 1000) {
-    return `${(amount / 1000).toFixed(1)}k`;
-  }
-  return String(amount);
-}
-
 // ─── タブ切り替え ───
 
 function setupTabNavigation() {
@@ -203,7 +188,7 @@ async function renderCalendar() {
     if (dailyTotals[dateStr]) {
       const amountSpan = document.createElement('span');
       amountSpan.className = 'cell-amount';
-      amountSpan.textContent = `¥${formatCompactAmount(dailyTotals[dateStr])}`;
+      amountSpan.textContent = `¥${dailyTotals[dateStr].toLocaleString()}`;
       cell.appendChild(amountSpan);
     }
 
@@ -307,7 +292,12 @@ async function renderHome() {
       responsive: true,
       maintainAspectRatio: true,
       layout: {
-        padding: 40, // 引き出し線のためのスペース
+        padding: {
+          top: 40,
+          right: 110,
+          bottom: 40,
+          left: 110,
+        },
       },
       plugins: {
         legend: {
@@ -329,7 +319,7 @@ async function renderHome() {
     plugins: [{
       id: 'sliceLabels',
       afterDatasetsDraw(chart) {
-        const { ctx, data } = chart;
+        const { ctx, chartArea, data } = chart;
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
@@ -344,7 +334,7 @@ async function renderHome() {
             true
           );
 
-          if (percent < 8) return; // 8%未満は引き出し線対応へ
+          if (percent < 8) return;
 
           const midAngle = (startAngle + endAngle) / 2;
           const radius = (outerRadius + innerRadius) / 2;
@@ -356,7 +346,7 @@ async function renderHome() {
 
           ctx.save();
           ctx.fillStyle = textColor;
-          ctx.font = 'bold 13px sans-serif';
+          ctx.font = 'bold 14px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(`${label} ${percent.toFixed(0)}%`, labelX, labelY);
@@ -364,7 +354,12 @@ async function renderHome() {
         });
 
         // 小さい扇: 引き出し線で外に
-        // 同じ側のラベルが重ならないよう、Yで並べ替えて調整
+        // キャンバスの左右端に確実に収める
+        const canvas = chart.canvas;
+        const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
+        const leftEdge = 8;         // キャンバス左端からの余白
+        const rightEdge = canvasWidth - 8; // キャンバス右端からの余白
+
         const smallLabels = [];
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
@@ -378,10 +373,14 @@ async function renderHome() {
           const midAngle = (startAngle + endAngle) / 2;
           const startX = x + Math.cos(midAngle) * outerRadius;
           const startY = y + Math.sin(midAngle) * outerRadius;
+          const isRight = Math.cos(midAngle) >= 0;
+
+          // 折れ点（円の少し外側）
           const bendX = x + Math.cos(midAngle) * (outerRadius + 15);
           const bendY = y + Math.sin(midAngle) * (outerRadius + 15);
-          const isRight = Math.cos(midAngle) > 0;
-          const endX = isRight ? bendX + 20 : bendX - 20;
+
+          // 水平線終端（キャンバス端に近づける）
+          const endX = isRight ? rightEdge - 60 : leftEdge + 60;
           const endY = bendY;
 
           smallLabels.push({
@@ -394,12 +393,11 @@ async function renderHome() {
           });
         });
 
-        // 左右にグループ分けしてYで整列（重なり回避）
         const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
         const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
 
-        adjustLabelYPositions(rightLabels, 18);
-        adjustLabelYPositions(leftLabels, 18);
+        adjustLabelYPositions(rightLabels, 22);
+        adjustLabelYPositions(leftLabels, 22);
 
         [...rightLabels, ...leftLabels].forEach(l => {
           ctx.save();
@@ -412,7 +410,7 @@ async function renderHome() {
           ctx.stroke();
 
           ctx.fillStyle = '#333333';
-          ctx.font = '11px sans-serif';
+          ctx.font = '12px sans-serif';
           ctx.textAlign = l.isRight ? 'left' : 'right';
           ctx.textBaseline = 'middle';
           const textOffsetX = l.isRight ? 4 : -4;
@@ -424,9 +422,6 @@ async function renderHome() {
   });
 }
 
-/**
- * ラベルのY位置を調整して重なりを防ぐ
- */
 function adjustLabelYPositions(labels, minSpacing) {
   for (let i = 1; i < labels.length; i++) {
     const prev = labels[i - 1];
