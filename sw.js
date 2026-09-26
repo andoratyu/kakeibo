@@ -1,7 +1,6 @@
 // Service Worker
-// キャッシュバスティングのため、更新時はCACHE_VERSIONを変える
 
-const CACHE_VERSION = 'v5'; // ← 更新時はここを v3, v4 と上げる
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `kakeibo-${CACHE_VERSION}`;
 
 const urlsToCache = [
@@ -17,20 +16,20 @@ const urlsToCache = [
   'icons/web-app-manifest-512x512.png',
   'icons/favicon.ico',
   'icons/favicon.svg',
-  'icons/favicon-96x96.png'
+  'icons/favicon-96x96.png',
+  'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'
 ];
 
-// インストール時
 self.addEventListener('install', event => {
   console.log(`Service Worker インストール: ${CACHE_VERSION}`);
-  self.skipWaiting(); // 新版が入ったら即座に有効化
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
+      .catch(err => console.error('キャッシュ登録失敗:', err))
   );
 });
 
-// アクティベート時: 古いキャッシュ削除
 self.addEventListener('activate', event => {
   console.log(`Service Worker アクティベート: ${CACHE_VERSION}`);
   event.waitUntil(
@@ -43,16 +42,14 @@ self.addEventListener('activate', event => {
             return caches.delete(name);
           })
       );
-    }).then(() => self.clients.claim()) // 既存のタブも即座に新版を使う
+    }).then(() => self.clients.claim())
   );
 });
 
-// フェッチ時: ネットワーク優先、失敗したらキャッシュ
 self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // ネットワーク成功: キャッシュも更新して返す
         const responseClone = response.clone();
         caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, responseClone);
@@ -60,7 +57,6 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => {
-        // ネットワーク失敗: キャッシュから返す（オフライン時）
         return caches.match(event.request);
       })
   );

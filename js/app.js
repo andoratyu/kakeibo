@@ -1,12 +1,15 @@
-// app.js — メインロジック（画面制御、カレンダー描画、モーダル）
+// app.js — メインロジック
 
 // 状態管理
 const state = {
   currentPage: 'calendar',
   currentYear: new Date().getFullYear(),
-  currentMonth: new Date().getMonth() + 1, // 1-indexed
+  currentMonth: new Date().getMonth() + 1,
+  homeYear: new Date().getFullYear(),
+  homeMonth: new Date().getMonth() + 1,
   selectedDate: null,
   editingTransactionId: null,
+  homeChart: null,
 };
 
 // ─── 初期化 ───
@@ -16,9 +19,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await populateCategorySelect();
     setupTabNavigation();
     setupCalendarNavigation();
+    setupHomeNavigation();
     setupModals();
     setupForm();
     await renderCalendar();
+    await renderHome();
     console.log('app.js 初期化完了');
   } catch (err) {
     console.error('初期化エラー:', err);
@@ -45,6 +50,28 @@ function formatDateJP(dateStr) {
   return `${m}月${d}日（${weekdays[date.getDay()]}）`;
 }
 
+function getMonthRange(year, month) {
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(year, month, 0).getDate();
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  return { startDate, endDate, lastDay };
+}
+
+/**
+ * 金額を短縮表示（カレンダーマス用）
+ * 1000以上は「1.2k」形式、1万以上は「1.2万」
+ */
+function formatCompactAmount(amount) {
+  if (amount >= 10000) {
+    const val = amount / 10000;
+    return val >= 10 ? `${Math.floor(val)}万` : `${val.toFixed(1)}万`;
+  }
+  if (amount >= 1000) {
+    return `${(amount / 1000).toFixed(1)}k`;
+  }
+  return String(amount);
+}
+
 // ─── タブ切り替え ───
 
 function setupTabNavigation() {
@@ -56,7 +83,7 @@ function setupTabNavigation() {
   });
 }
 
-function switchPage(pageId) {
+async function switchPage(pageId) {
   state.currentPage = pageId;
 
   document.querySelectorAll('.page').forEach(page => {
@@ -67,9 +94,15 @@ function switchPage(pageId) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.page === pageId);
   });
+
+  if (pageId === 'home') {
+    await renderHome();
+  } else if (pageId === 'calendar') {
+    await renderCalendar();
+  }
 }
 
-// ─── カレンダー ───
+// ─── カレンダー画面 ───
 
 function setupCalendarNavigation() {
   document.getElementById('prev-month').addEventListener('click', () => {
@@ -103,27 +136,20 @@ async function renderCalendar() {
 
   document.getElementById('current-month').textContent = `${y}年${m}月`;
 
-  // 当月の記録を取得
-  const startDate = `${y}-${String(m).padStart(2, '0')}-01`;
-  const lastDay = new Date(y, m, 0).getDate();
-  const endDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  const { startDate, endDate, lastDay } = getMonthRange(y, m);
   const transactions = await KakeiboDB.getTransactionsByPeriod(startDate, endDate);
 
-  // 日別集計
   const dailyTotals = {};
   transactions.forEach(t => {
     dailyTotals[t.date] = (dailyTotals[t.date] || 0) + t.amount;
   });
 
-  // 月合計
   const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
   document.getElementById('month-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
 
-  // カレンダー描画
   const container = document.getElementById('calendar-container');
   container.innerHTML = '';
 
-  // 曜日ヘッダー
   const headerRow = document.createElement('div');
   headerRow.className = 'calendar-header';
   ['日', '月', '火', '水', '木', '金', '土'].forEach((wd, i) => {
@@ -136,7 +162,6 @@ async function renderCalendar() {
   });
   container.appendChild(headerRow);
 
-  // 日付マス
   const firstDay = new Date(y, m - 1, 1).getDay();
   const totalCells = Math.ceil((firstDay + lastDay) / 7) * 7;
   const today = getTodayString();
@@ -178,13 +203,257 @@ async function renderCalendar() {
     if (dailyTotals[dateStr]) {
       const amountSpan = document.createElement('span');
       amountSpan.className = 'cell-amount';
-      amountSpan.textContent = `¥${dailyTotals[dateStr].toLocaleString()}`;
+      amountSpan.textContent = `¥${formatCompactAmount(dailyTotals[dateStr])}`;
       cell.appendChild(amountSpan);
     }
 
     cell.addEventListener('click', () => openDateModal(dateStr));
     currentRow.appendChild(cell);
   }
+}
+
+// ─── ホーム画面 ───
+
+function setupHomeNavigation() {
+  document.getElementById('home-prev-month').addEventListener('click', () => {
+    state.homeMonth--;
+    if (state.homeMonth < 1) {
+      state.homeMonth = 12;
+      state.homeYear--;
+    }
+    renderHome();
+  });
+
+  document.getElementById('home-next-month').addEventListener('click', () => {
+    state.homeMonth++;
+    if (state.homeMonth > 12) {
+      state.homeMonth = 1;
+      state.homeYear++;
+    }
+    renderHome();
+  });
+
+  document.getElementById('home-today-btn').addEventListener('click', () => {
+    const now = new Date();
+    state.homeYear = now.getFullYear();
+    state.homeMonth = now.getMonth() + 1;
+    renderHome();
+  });
+}
+
+async function renderHome() {
+  const { homeYear: y, homeMonth: m } = state;
+
+  document.getElementById('home-current-month').textContent = `${y}年${m}月`;
+
+  const { startDate, endDate } = getMonthRange(y, m);
+  const transactions = await KakeiboDB.getTransactionsByPeriod(startDate, endDate);
+  const categories = await KakeiboDB.getAllCategories();
+
+  const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
+  document.getElementById('home-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
+
+  const emptyEl = document.getElementById('home-empty');
+  const canvasEl = document.getElementById('home-chart');
+
+  if (transactions.length === 0) {
+    emptyEl.style.display = 'block';
+    canvasEl.style.display = 'none';
+    if (state.homeChart) {
+      state.homeChart.destroy();
+      state.homeChart = null;
+    }
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  canvasEl.style.display = 'block';
+
+  const catMap = {};
+  categories.forEach(c => { catMap[c.id] = c; });
+
+  const parentTotals = {};
+  transactions.forEach(t => {
+    const cat = catMap[t.category_id];
+    if (!cat) return;
+    const parentId = cat.parent_id || cat.id;
+    parentTotals[parentId] = (parentTotals[parentId] || 0) + t.amount;
+  });
+
+  const sortedEntries = Object.entries(parentTotals).sort((a, b) => b[1] - a[1]);
+
+  const labels = sortedEntries.map(([id]) => catMap[id]?.name || '(不明)');
+  const values = sortedEntries.map(([, amt]) => amt);
+
+  const colors = generateGrayscaleColors(labels.length);
+
+  if (state.homeChart) {
+    state.homeChart.destroy();
+  }
+
+  const ctx = canvasEl.getContext('2d');
+  state.homeChart = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      layout: {
+        padding: 40, // 引き出し線のためのスペース
+      },
+      plugins: {
+        legend: {
+          display: false,
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => {
+              const label = context.label || '';
+              const value = context.parsed;
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percent = ((value / total) * 100).toFixed(1);
+              return `${label}: ¥${value.toLocaleString()} (${percent}%)`;
+            },
+          },
+        },
+      },
+    },
+    plugins: [{
+      id: 'sliceLabels',
+      afterDatasetsDraw(chart) {
+        const { ctx, data } = chart;
+        const meta = chart.getDatasetMeta(0);
+        const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+
+        // 大きい扇: 扇内にラベル
+        meta.data.forEach((arc, i) => {
+          const value = data.datasets[0].data[i];
+          const percent = (value / total) * 100;
+          const label = data.labels[i];
+
+          const { x, y, startAngle, endAngle, outerRadius, innerRadius } = arc.getProps(
+            ['x', 'y', 'startAngle', 'endAngle', 'outerRadius', 'innerRadius'],
+            true
+          );
+
+          if (percent < 8) return; // 8%未満は引き出し線対応へ
+
+          const midAngle = (startAngle + endAngle) / 2;
+          const radius = (outerRadius + innerRadius) / 2;
+          const labelX = x + Math.cos(midAngle) * radius;
+          const labelY = y + Math.sin(midAngle) * radius;
+
+          const bgColor = data.datasets[0].backgroundColor[i];
+          const textColor = getContrastColor(bgColor);
+
+          ctx.save();
+          ctx.fillStyle = textColor;
+          ctx.font = 'bold 13px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`${label} ${percent.toFixed(0)}%`, labelX, labelY);
+          ctx.restore();
+        });
+
+        // 小さい扇: 引き出し線で外に
+        // 同じ側のラベルが重ならないよう、Yで並べ替えて調整
+        const smallLabels = [];
+        meta.data.forEach((arc, i) => {
+          const value = data.datasets[0].data[i];
+          const percent = (value / total) * 100;
+          if (percent >= 8) return;
+
+          const { x, y, startAngle, endAngle, outerRadius } = arc.getProps(
+            ['x', 'y', 'startAngle', 'endAngle', 'outerRadius'],
+            true
+          );
+          const midAngle = (startAngle + endAngle) / 2;
+          const startX = x + Math.cos(midAngle) * outerRadius;
+          const startY = y + Math.sin(midAngle) * outerRadius;
+          const bendX = x + Math.cos(midAngle) * (outerRadius + 15);
+          const bendY = y + Math.sin(midAngle) * (outerRadius + 15);
+          const isRight = Math.cos(midAngle) > 0;
+          const endX = isRight ? bendX + 20 : bendX - 20;
+          const endY = bendY;
+
+          smallLabels.push({
+            label: data.labels[i],
+            percent,
+            startX, startY,
+            bendX, bendY,
+            endX, endY,
+            isRight,
+          });
+        });
+
+        // 左右にグループ分けしてYで整列（重なり回避）
+        const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
+        const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
+
+        adjustLabelYPositions(rightLabels, 18);
+        adjustLabelYPositions(leftLabels, 18);
+
+        [...rightLabels, ...leftLabels].forEach(l => {
+          ctx.save();
+          ctx.strokeStyle = '#666666';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(l.startX, l.startY);
+          ctx.lineTo(l.bendX, l.bendY);
+          ctx.lineTo(l.endX, l.endY);
+          ctx.stroke();
+
+          ctx.fillStyle = '#333333';
+          ctx.font = '11px sans-serif';
+          ctx.textAlign = l.isRight ? 'left' : 'right';
+          ctx.textBaseline = 'middle';
+          const textOffsetX = l.isRight ? 4 : -4;
+          ctx.fillText(`${l.label} ${l.percent.toFixed(0)}%`, l.endX + textOffsetX, l.endY);
+          ctx.restore();
+        });
+      },
+    }],
+  });
+}
+
+/**
+ * ラベルのY位置を調整して重なりを防ぐ
+ */
+function adjustLabelYPositions(labels, minSpacing) {
+  for (let i = 1; i < labels.length; i++) {
+    const prev = labels[i - 1];
+    const curr = labels[i];
+    if (curr.endY - prev.endY < minSpacing) {
+      curr.endY = prev.endY + minSpacing;
+    }
+  }
+}
+
+function generateGrayscaleColors(n) {
+  const colors = [];
+  const min = 60;
+  const max = 200;
+  for (let i = 0; i < n; i++) {
+    const value = n === 1 ? 130 : Math.round(min + (max - min) * (i / (n - 1)));
+    colors.push(`rgb(${value}, ${value}, ${value})`);
+  }
+  return colors;
+}
+
+function getContrastColor(rgbStr) {
+  const match = rgbStr.match(/\d+/g);
+  if (!match) return '#000000';
+  const [r, g, b] = match.map(Number);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 128 ? '#000000' : '#ffffff';
 }
 
 // ─── モーダル管理 ───
@@ -286,7 +555,6 @@ async function handleSave() {
 
   try {
     if (state.editingTransactionId) {
-      // 編集
       const existing = await KakeiboDB.get(KakeiboDB.STORES.transactions, state.editingTransactionId);
       await KakeiboDB.updateTransaction({
         ...existing,
@@ -296,13 +564,13 @@ async function handleSave() {
         memo,
       });
     } else {
-      // 新規
       await KakeiboDB.addTransaction({ date, category_id, amount, memo });
     }
 
     closeFormModal();
     await renderDateModalBody();
     await renderCalendar();
+    await renderHome();
   } catch (err) {
     console.error('保存エラー:', err);
     alert('保存に失敗しました: ' + err.message);
@@ -318,6 +586,7 @@ async function handleDelete() {
     closeFormModal();
     await renderDateModalBody();
     await renderCalendar();
+    await renderHome();
   } catch (err) {
     console.error('削除エラー:', err);
     alert('削除に失敗しました: ' + err.message);
@@ -343,7 +612,6 @@ async function populateCategorySelect() {
 }
 
 function setupForm() {
-  // フォーム送信で保存
   document.getElementById('transaction-form').addEventListener('submit', (e) => {
     e.preventDefault();
     handleSave();

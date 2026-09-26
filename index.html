@@ -23,22 +23,35 @@
   <!-- ホーム画面 -->
   <section id="page-home" class="page">
     <header>
-      <h1>ホーム</h1>
+      <div class="month-nav">
+        <button id="home-prev-month" class="nav-btn">◀</button>
+        <span id="home-current-month">2026年9月</span>
+        <button id="home-next-month" class="nav-btn">▶</button>
+        <button id="home-today-btn" class="today-btn">今日</button>
+      </div>
     </header>
     <div class="page-content">
-      <p class="placeholder">円グラフはフェーズ4で実装します</p>
+      <div class="home-total">
+        <div class="home-total-amount" id="home-total-amount">¥0</div>
+      </div>
+      <div class="chart-container">
+        <canvas id="home-chart"></canvas>
+      </div>
+      <div id="home-empty" class="empty-message" style="display:none;">
+        記録がありません
+      </div>
     </div>
   </section>
 
   <!-- カレンダー画面 -->
   <section id="page-calendar" class="page active">
     <header>
-        <div class="month-nav">
-            <button id="prev-month" class="nav-btn">◀</button>
-            <span id="current-month">2026年9月</span>
-            <button id="next-month" class="nav-btn">▶</button>
-            <button id="today-btn" class="today-btn">今日</button>
-        </div>
+      <div class="month-nav">
+        <button id="prev-month" class="nav-btn">◀</button>
+        <span id="current-month">2026年9月</span>
+        <button id="next-month" class="nav-btn">▶</button>
+        <button id="today-btn" class="today-btn">今日</button>
+      </div>
     </header>
     <div class="page-content">
       <div id="calendar-container"></div>
@@ -124,6 +137,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Chart.js（CDN） -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
   <script src="js/db.js"></script>
   <script src="js/holidays.js"></script>

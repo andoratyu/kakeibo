@@ -11,7 +11,7 @@ body {
   color: #333333;
   -webkit-tap-highlight-color: transparent;
   line-height: 1.5;
-  padding-bottom: 64px; /* タブナビの分 */
+  padding-bottom: 64px;
 }
 
 /* ページ全体 */
@@ -47,12 +47,18 @@ header h1 {
   padding: 40px 20px;
 }
 
+.empty-message {
+  text-align: center;
+  color: #999999;
+  padding: 32px 16px;
+}
+
 /* 月ナビ */
 .month-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 24px;
+  gap: 16px;
   width: 100%;
 }
 
@@ -70,14 +76,52 @@ header h1 {
   border-radius: 4px;
 }
 
-#current-month {
+#current-month, #home-current-month {
   font-size: 18px;
   font-weight: bold;
   min-width: 140px;
   text-align: center;
 }
 
-/* カレンダー */
+.today-btn {
+  background: none;
+  border: 1px solid #333333;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 10px;
+  color: #333333;
+  font-family: inherit;
+}
+
+.today-btn:hover {
+  background-color: #333333;
+  color: #ffffff;
+}
+
+/* ─── ホーム画面 ─── */
+
+.home-total {
+  text-align: center;
+  padding: 24px 16px 16px;
+}
+
+.home-total-amount {
+  font-size: 36px;
+  font-weight: bold;
+  color: #333333;
+}
+
+.chart-container {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 40px 60px;
+}
+
+/* ─── カレンダー ─── */
+
 #calendar-container {
   width: 100%;
 }
@@ -110,7 +154,7 @@ header h1 {
 
 .calendar-cell {
   border: 1px solid #f0f0f0;
-  min-height: 60px;
+  min-height: 70px;
   padding: 4px;
   cursor: pointer;
   display: flex;
@@ -139,7 +183,7 @@ header h1 {
 }
 
 .cell-date {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: bold;
 }
 
@@ -153,8 +197,9 @@ header h1 {
 }
 
 .cell-amount {
-  font-size: 10px;
-  color: #666666;
+  font-size: 13px;
+  color: #333333;
+  font-weight: 500;
   margin-top: auto;
   text-align: right;
   overflow: hidden;
@@ -176,7 +221,8 @@ header h1 {
   font-size: 18px;
 }
 
-/* タブナビ */
+/* ─── タブナビ ─── */
+
 #tab-nav {
   position: fixed;
   bottom: 0;
@@ -216,7 +262,8 @@ header h1 {
   font-size: 11px;
 }
 
-/* モーダル */
+/* ─── モーダル ─── */
+
 .modal {
   display: none;
   position: fixed;
@@ -357,12 +404,6 @@ header h1 {
   font-weight: bold;
 }
 
-.empty-message {
-  text-align: center;
-  color: #999999;
-  padding: 32px 16px;
-}
-
 /* 入力フォーム */
 #transaction-form {
   display: flex;
@@ -380,7 +421,7 @@ label {
 }
 
 input, select {
-  font-size: 16px; /* iOSでズーム防止 */
+  font-size: 16px;
   padding: 12px;
   border: 1px solid #cccccc;
   border-radius: 6px;
@@ -421,21 +462,4 @@ input:focus, select:focus {
 
 .delete-btn:hover {
   background-color: #ffeeee;
-}
-
-.today-btn {
-  background: none;
-  border: 1px solid #333333;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px 10px;
-  color: #333333;
-  font-family: inherit;
-  margin-left: 12px;
-}
-
-.today-btn:hover {
-  background-color: #333333;
-  color: #ffffff;
 }
