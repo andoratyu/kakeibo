@@ -63,12 +63,11 @@ function getMonthRange(year, month) {
 function getAmountFontSize(amount) {
   const text = `${amount.toLocaleString()}円`;
   const len = text.length;
-  // 文字数に応じてサイズ調整
-  if (len <= 5) return '13px';   // 例: 500円, 999円
-  if (len <= 6) return '12px';   // 例: 5,000円
-  if (len <= 7) return '11px';   // 例: 10,000円
-  if (len <= 8) return '10px';   // 例: 100,000円
-  return '9px';                  // 例: 1,000,000円以上
+  if (len <= 5) return '13px';   // 500円
+  if (len <= 6) return '12px';   // 5,000円
+  if (len <= 7) return '11px';   // 10,000円
+  if (len <= 8) return '10px';   // 100,000円
+  return '9px';                  // 1,000,000円以上
 }
 
 // ─── タブ切り替え ───
@@ -203,7 +202,6 @@ async function renderCalendar() {
       const amountSpan = document.createElement('span');
       amountSpan.className = 'cell-amount';
       amountSpan.textContent = `${dailyTotals[dateStr].toLocaleString()}円`;
-      // 桁数に応じてフォントサイズを動的に調整
       amountSpan.style.fontSize = getAmountFontSize(dailyTotals[dateStr]);
       cell.appendChild(amountSpan);
     }
@@ -293,8 +291,8 @@ async function renderHome() {
   }
 
   const isMobile = window.innerWidth < 600;
-  // 上下と左右のpaddingを同じに → 円が真円になる
-  const padding = isMobile ? 50 : 90;
+  // padding: 引き出し線とラベル分の余白確保（円は切れないサイズに）
+  const padding = isMobile ? 65 : 90;
 
   const ctx = canvasEl.getContext('2d');
   state.homeChart = new Chart(ctx, {
@@ -373,12 +371,7 @@ async function renderHome() {
           ctx.restore();
         });
 
-        // 小さい扇: 引き出し線で外に
-        const canvas = chart.canvas;
-        const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
-        const labelPad = isMobile ? 48 : 68;
-        const edgeMargin = 4;
-
+        // 小さい扇: 引き出し線で外に（円周から一定距離、短めに）
         const smallLabels = [];
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
@@ -394,12 +387,13 @@ async function renderHome() {
           const startY = y + Math.sin(midAngle) * outerRadius;
           const isRight = Math.cos(midAngle) >= 0;
 
+          // 円周から10px外に折れ点
           const bendX = x + Math.cos(midAngle) * (outerRadius + 10);
           const bendY = y + Math.sin(midAngle) * (outerRadius + 10);
 
-          const endX = isRight
-            ? canvasWidth - edgeMargin - labelPad
-            : edgeMargin + labelPad;
+          // 水平線終端: 円中心から外側に一定距離（円半径 + 35px）
+          const horizontalReach = outerRadius + 35;
+          const endX = isRight ? x + horizontalReach : x - horizontalReach;
           const endY = bendY;
 
           smallLabels.push({
