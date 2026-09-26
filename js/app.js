@@ -188,7 +188,8 @@ async function renderCalendar() {
     if (dailyTotals[dateStr]) {
       const amountSpan = document.createElement('span');
       amountSpan.className = 'cell-amount';
-      amountSpan.textContent = `¥${dailyTotals[dateStr].toLocaleString()}`;
+      // 「5,000円」形式（円を後ろに、¥は使わない）
+      amountSpan.textContent = `${dailyTotals[dateStr].toLocaleString()}円`;
       cell.appendChild(amountSpan);
     }
 
@@ -276,6 +277,11 @@ async function renderHome() {
     state.homeChart.destroy();
   }
 
+  // 画面幅に応じて padding を調整
+  const isMobile = window.innerWidth < 600;
+  const horizontalPadding = isMobile ? 60 : 100;
+  const verticalPadding = isMobile ? 20 : 30;
+
   const ctx = canvasEl.getContext('2d');
   state.homeChart = new Chart(ctx, {
     type: 'pie',
@@ -293,10 +299,10 @@ async function renderHome() {
       maintainAspectRatio: true,
       layout: {
         padding: {
-          top: 40,
-          right: 110,
-          bottom: 40,
-          left: 110,
+          top: verticalPadding,
+          right: horizontalPadding,
+          bottom: verticalPadding,
+          left: horizontalPadding,
         },
       },
       plugins: {
@@ -319,7 +325,7 @@ async function renderHome() {
     plugins: [{
       id: 'sliceLabels',
       afterDatasetsDraw(chart) {
-        const { ctx, chartArea, data } = chart;
+        const { ctx, data } = chart;
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
@@ -346,7 +352,7 @@ async function renderHome() {
 
           ctx.save();
           ctx.fillStyle = textColor;
-          ctx.font = 'bold 14px sans-serif';
+          ctx.font = isMobile ? 'bold 12px sans-serif' : 'bold 14px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(`${label} ${percent.toFixed(0)}%`, labelX, labelY);
@@ -354,11 +360,10 @@ async function renderHome() {
         });
 
         // 小さい扇: 引き出し線で外に
-        // キャンバスの左右端に確実に収める
         const canvas = chart.canvas;
         const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
-        const leftEdge = 8;         // キャンバス左端からの余白
-        const rightEdge = canvasWidth - 8; // キャンバス右端からの余白
+        const labelWidth = isMobile ? 55 : 70;
+        const edgeMargin = 4;
 
         const smallLabels = [];
         meta.data.forEach((arc, i) => {
@@ -375,12 +380,12 @@ async function renderHome() {
           const startY = y + Math.sin(midAngle) * outerRadius;
           const isRight = Math.cos(midAngle) >= 0;
 
-          // 折れ点（円の少し外側）
-          const bendX = x + Math.cos(midAngle) * (outerRadius + 15);
-          const bendY = y + Math.sin(midAngle) * (outerRadius + 15);
+          const bendX = x + Math.cos(midAngle) * (outerRadius + 10);
+          const bendY = y + Math.sin(midAngle) * (outerRadius + 10);
 
-          // 水平線終端（キャンバス端に近づける）
-          const endX = isRight ? rightEdge - 60 : leftEdge + 60;
+          const endX = isRight
+            ? canvasWidth - edgeMargin - labelWidth
+            : edgeMargin + labelWidth;
           const endY = bendY;
 
           smallLabels.push({
@@ -396,8 +401,8 @@ async function renderHome() {
         const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
         const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
 
-        adjustLabelYPositions(rightLabels, 22);
-        adjustLabelYPositions(leftLabels, 22);
+        adjustLabelYPositions(rightLabels, 18);
+        adjustLabelYPositions(leftLabels, 18);
 
         [...rightLabels, ...leftLabels].forEach(l => {
           ctx.save();
@@ -410,7 +415,7 @@ async function renderHome() {
           ctx.stroke();
 
           ctx.fillStyle = '#333333';
-          ctx.font = '12px sans-serif';
+          ctx.font = isMobile ? '10px sans-serif' : '12px sans-serif';
           ctx.textAlign = l.isRight ? 'left' : 'right';
           ctx.textBaseline = 'middle';
           const textOffsetX = l.isRight ? 4 : -4;
