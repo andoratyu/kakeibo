@@ -224,15 +224,14 @@ header h1 {
 }
 
 .cell-amount {
-  font-size: 12px;
   color: #cc0000;
   font-weight: bold;
   margin-top: auto;
   text-align: center;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 1px;
+  /* font-sizeはJavaScript側で動的に設定 */
 }
 
 .month-total {
@@ -494,9 +493,6 @@ input:focus, select:focus {
 
 /* ─── スマホ向け（狭い画面）調整 ─── */
 @media (max-width: 600px) {
-  .cell-amount {
-    font-size: 11px;
-  }
   .calendar-cell {
     min-height: 68px;
     padding: 3px 1px;

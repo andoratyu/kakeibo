@@ -57,6 +57,20 @@ function getMonthRange(year, month) {
   return { startDate, endDate, lastDay };
 }
 
+/**
+ * 桁数に応じてカレンダーマス用のフォントサイズを決める
+ */
+function getAmountFontSize(amount) {
+  const text = `${amount.toLocaleString()}円`;
+  const len = text.length;
+  // 文字数に応じてサイズ調整
+  if (len <= 5) return '13px';   // 例: 500円, 999円
+  if (len <= 6) return '12px';   // 例: 5,000円
+  if (len <= 7) return '11px';   // 例: 10,000円
+  if (len <= 8) return '10px';   // 例: 100,000円
+  return '9px';                  // 例: 1,000,000円以上
+}
+
 // ─── タブ切り替え ───
 
 function setupTabNavigation() {
@@ -188,8 +202,9 @@ async function renderCalendar() {
     if (dailyTotals[dateStr]) {
       const amountSpan = document.createElement('span');
       amountSpan.className = 'cell-amount';
-      // 「5,000円」形式（円を後ろに、¥は使わない）
       amountSpan.textContent = `${dailyTotals[dateStr].toLocaleString()}円`;
+      // 桁数に応じてフォントサイズを動的に調整
+      amountSpan.style.fontSize = getAmountFontSize(dailyTotals[dateStr]);
       cell.appendChild(amountSpan);
     }
 
@@ -277,10 +292,9 @@ async function renderHome() {
     state.homeChart.destroy();
   }
 
-  // 画面幅に応じて padding を調整
   const isMobile = window.innerWidth < 600;
-  const horizontalPadding = isMobile ? 60 : 100;
-  const verticalPadding = isMobile ? 20 : 30;
+  // 上下と左右のpaddingを同じに → 円が真円になる
+  const padding = isMobile ? 50 : 90;
 
   const ctx = canvasEl.getContext('2d');
   state.homeChart = new Chart(ctx, {
@@ -299,10 +313,10 @@ async function renderHome() {
       maintainAspectRatio: true,
       layout: {
         padding: {
-          top: verticalPadding,
-          right: horizontalPadding,
-          bottom: verticalPadding,
-          left: horizontalPadding,
+          top: padding,
+          right: padding,
+          bottom: padding,
+          left: padding,
         },
       },
       plugins: {
@@ -352,7 +366,7 @@ async function renderHome() {
 
           ctx.save();
           ctx.fillStyle = textColor;
-          ctx.font = isMobile ? 'bold 12px sans-serif' : 'bold 14px sans-serif';
+          ctx.font = 'bold 15px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(`${label} ${percent.toFixed(0)}%`, labelX, labelY);
@@ -362,7 +376,7 @@ async function renderHome() {
         // 小さい扇: 引き出し線で外に
         const canvas = chart.canvas;
         const canvasWidth = canvas.width / (window.devicePixelRatio || 1);
-        const labelWidth = isMobile ? 55 : 70;
+        const labelPad = isMobile ? 48 : 68;
         const edgeMargin = 4;
 
         const smallLabels = [];
@@ -384,8 +398,8 @@ async function renderHome() {
           const bendY = y + Math.sin(midAngle) * (outerRadius + 10);
 
           const endX = isRight
-            ? canvasWidth - edgeMargin - labelWidth
-            : edgeMargin + labelWidth;
+            ? canvasWidth - edgeMargin - labelPad
+            : edgeMargin + labelPad;
           const endY = bendY;
 
           smallLabels.push({
@@ -401,8 +415,8 @@ async function renderHome() {
         const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
         const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
 
-        adjustLabelYPositions(rightLabels, 18);
-        adjustLabelYPositions(leftLabels, 18);
+        adjustLabelYPositions(rightLabels, 22);
+        adjustLabelYPositions(leftLabels, 22);
 
         [...rightLabels, ...leftLabels].forEach(l => {
           ctx.save();
@@ -415,7 +429,7 @@ async function renderHome() {
           ctx.stroke();
 
           ctx.fillStyle = '#333333';
-          ctx.font = isMobile ? '10px sans-serif' : '12px sans-serif';
+          ctx.font = '13px sans-serif';
           ctx.textAlign = l.isRight ? 'left' : 'right';
           ctx.textBaseline = 'middle';
           const textOffsetX = l.isRight ? 4 : -4;
