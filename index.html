@@ -90,7 +90,20 @@
       </div>
       <div class="settings-section">
         <h2>データ管理</h2>
-        <p class="placeholder-small">CSVエクスポート・インポートは今後実装予定</p>
+        <div class="csv-export-group">
+          <div class="csv-export-title">月次エクスポート</div>
+          <div class="csv-export-selectors">
+            <select id="export-year"></select>
+            <span>年</span>
+            <select id="export-month"></select>
+            <span>月</span>
+            <button id="export-month-btn" class="add-btn">DL</button>
+          </div>
+        </div>
+        <div class="csv-export-group">
+          <button id="export-all-btn" class="export-all-btn">全期間をエクスポート</button>
+        </div>
+        <p class="settings-hint" style="margin-top:12px;">Safariの「ダウンロード」フォルダに保存されます。CSVインポートは次のフェーズで実装します。</p>
       </div>
     </div>
   </section>

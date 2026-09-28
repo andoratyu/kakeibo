@@ -751,3 +751,58 @@ input:focus, select:focus {
     padding: 4px 0;
   }
 }
+
+/* ─── CSVエクスポート ─── */
+
+.csv-export-group {
+  padding: 8px 0;
+}
+
+.csv-export-title {
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 8px;
+}
+
+.csv-export-selectors {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.csv-export-selectors select {
+  padding: 8px 10px;
+  border: 1px solid #cccccc;
+  border-radius: 6px;
+  font-size: 15px;
+  background: #ffffff;
+  font-family: inherit;
+  color: #333333;
+}
+
+.csv-export-selectors span {
+  font-size: 13px;
+  color: #666666;
+}
+
+.csv-export-selectors #export-month-btn {
+  margin-left: auto;
+}
+
+.export-all-btn {
+  width: 100%;
+  padding: 12px;
+  background: none;
+  color: #333333;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.export-all-btn:hover {
+  background-color: #f0f0f0;
+}

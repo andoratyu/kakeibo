@@ -71,7 +71,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupModals();
     setupRecurringModal();
     setupForm();
+    setupCsvExport();
     populateDayOfMonthSelect();
+    await populateExportYearMonth();
     await renderCalendar();
     await renderHome();
     console.log('app.js 初期化完了 バージョン:', window.APP_VERSION);
@@ -339,6 +341,7 @@ async function switchPage(pageId) {
     await renderCalendar();
   } else if (pageId === 'settings') {
     await renderRecurringList();
+    await populateExportYearMonth();
   }
 }
 
@@ -1079,4 +1082,149 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ─── CSVエクスポート ───
+
+function csvField(s) {
+  return `"${String(s).replace(/"/g, '""')}"`;
+}
+
+async function generateCsv(transactions, categories) {
+  let csv = '\uFEFF'; // UTF-8 BOM
+  csv += 'date,category_l1,category_l2,amount,memo\n';
+
+  const catMap = {};
+  categories.forEach(c => { catMap[c.id] = c; });
+
+  // 日付昇順ソート
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const t of sorted) {
+    const cat = catMap[t.category_id];
+    let l1 = '', l2 = '';
+    if (cat) {
+      if (cat.parent_id) {
+        const parent = catMap[cat.parent_id];
+        l1 = parent ? parent.name : '';
+        l2 = cat.name;
+      } else {
+        l1 = cat.name;
+      }
+    }
+
+    csv += [
+      csvField(t.date),
+      csvField(l1),
+      csvField(l2),
+      String(t.amount),
+      csvField(t.memo || ''),
+    ].join(',') + '\n';
+  }
+
+  return csv;
+}
+
+function downloadCsv(csv, filename) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+async function exportMonth(year, month) {
+  const { startDate, endDate } = getMonthRange(year, month);
+  const transactions = await KakeiboDB.getTransactionsByPeriod(startDate, endDate);
+
+  if (transactions.length === 0) {
+    alert(`${year}年${month}月にはデータがありません`);
+    return;
+  }
+
+  const categories = await KakeiboDB.getAllCategories();
+  const csv = await generateCsv(transactions, categories);
+  const filename = `kakeibo_${year}-${String(month).padStart(2, '0')}.csv`;
+  downloadCsv(csv, filename);
+}
+
+async function exportAll() {
+  const transactions = await KakeiboDB.getAll(KakeiboDB.STORES.transactions);
+
+  if (transactions.length === 0) {
+    alert('データがありません');
+    return;
+  }
+
+  const categories = await KakeiboDB.getAllCategories();
+  const csv = await generateCsv(transactions, categories);
+  const today = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = `${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
+  const filename = `kakeibo_all_${dateStr}.csv`;
+  downloadCsv(csv, filename);
+}
+
+async function populateExportYearMonth() {
+  const yearSelect = document.getElementById('export-year');
+  const monthSelect = document.getElementById('export-month');
+  if (!yearSelect || !monthSelect) return;
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // 最古のデータ年を取得
+  const transactions = await KakeiboDB.getAll(KakeiboDB.STORES.transactions);
+  let minYear = currentYear;
+  if (transactions.length > 0) {
+    const minDate = transactions.reduce((min, t) => t.date < min ? t.date : min, transactions[0].date);
+    minYear = parseInt(minDate.split('-')[0], 10);
+  }
+
+  // 選択済みの値を維持
+  const prevYear = yearSelect.value;
+  const prevMonth = monthSelect.value;
+
+  yearSelect.innerHTML = '';
+  for (let y = currentYear; y >= minYear; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = `${y}`;
+    yearSelect.appendChild(opt);
+  }
+  yearSelect.value = prevYear || currentYear;
+
+  if (monthSelect.options.length === 0) {
+    for (let m = 1; m <= 12; m++) {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = `${m}`;
+      monthSelect.appendChild(opt);
+    }
+    monthSelect.value = currentMonth;
+  } else {
+    monthSelect.value = prevMonth || currentMonth;
+  }
+}
+
+function setupCsvExport() {
+  const monthBtn = document.getElementById('export-month-btn');
+  const allBtn = document.getElementById('export-all-btn');
+  if (monthBtn) {
+    monthBtn.addEventListener('click', () => {
+      const year = parseInt(document.getElementById('export-year').value, 10);
+      const month = parseInt(document.getElementById('export-month').value, 10);
+      exportMonth(year, month);
+    });
+  }
+  if (allBtn) {
+    allBtn.addEventListener('click', () => {
+      exportAll();
+    });
+  }
 }
