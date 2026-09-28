@@ -88,6 +88,16 @@
         <p class="settings-hint">毎日・毎週・毎月の定期支出を自動で記録します。登録日以降の該当日に自動追加されます。</p>
         <div id="recurring-list" class="recurring-list"></div>
       </div>
+
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2>カテゴリ管理</h2>
+          <button id="add-category-btn" class="add-btn">+ 追加</button>
+        </div>
+        <p class="settings-hint">大カテゴリ・小カテゴリを管理できます。「固定費」「その他」は削除・名前変更できません。</p>
+        <div id="category-list" class="category-mgmt-list"></div>
+      </div>
+
       <div class="settings-section">
         <h2>データ管理</h2>
         <div class="csv-export-group">
@@ -158,8 +168,14 @@
             <input type="date" id="date-input" required>
           </label>
           <label>
-            カテゴリ
+            大カテゴリ
             <select id="category-select" required></select>
+          </label>
+          <label>
+            小カテゴリ
+            <select id="subcategory-select">
+              <option value="">（なし）</option>
+            </select>
           </label>
           <label>
             金額
@@ -233,6 +249,40 @@
     </div>
   </div>
 
+    <!-- カテゴリ追加/編集モーダル -->
+  <div id="category-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <button id="category-back-btn" class="back-btn">◀ 戻る</button>
+        <h2 id="category-modal-title">カテゴリを追加</h2>
+        <button type="button" id="category-save-btn" class="save-btn">保存</button>
+      </div>
+      <div class="modal-body">
+        <form id="category-form">
+          <label id="category-type-label">
+            種類
+            <div class="frequency-tabs">
+              <button type="button" class="cat-type-btn active" data-type="parent">大カテゴリ</button>
+              <button type="button" class="cat-type-btn" data-type="child">小カテゴリ</button>
+            </div>
+          </label>
+          <label id="category-parent-label" style="display:none;">
+            親カテゴリ
+            <select id="category-parent-select"></select>
+          </label>
+          <label>
+            名前
+            <input type="text" id="category-name-input" required maxlength="20" placeholder="例: 食費 or 外食">
+          </label>
+        </form>
+        <button type="button" id="category-delete-btn" class="delete-btn" style="display:none;">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart.js（CDN） -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <!-- Chart.js（CDN） -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 

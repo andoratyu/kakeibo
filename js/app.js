@@ -10,6 +10,10 @@ const state = {
   editingTransactionId: null,
   editingRecurringId: null,
   currentFrequency: 'monthly',
+  editingCategoryId: null,
+  categoryModalType: 'parent',
+  expandedParents: new Set(),
+  homeRenderData: null,          // ← 追加: ドリルダウン再描画用のキャッシュ
   homeChart: null,
 };
 
@@ -72,6 +76,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupRecurringModal();
     setupForm();
     setupCsvExport();
+    setupCategoryModal(); 
     populateDayOfMonthSelect();
     await populateExportYearMonth();
     await renderCalendar();
@@ -342,6 +347,7 @@ async function switchPage(pageId) {
   } else if (pageId === 'settings') {
     await renderRecurringList();
     await populateExportYearMonth();
+    await renderCategoryManagementList();
   }
 }
 
@@ -610,19 +616,36 @@ async function renderHome() {
     }],
   });
 
-  renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals, prevTotal);
+  state.homeRenderData = {
+    sortedEntries,
+    catMap,
+    monthTotal,
+    prevParentTotals,
+    prevTotal,
+    transactions,
+    prevTransactions,
+  };
+  renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals, prevTotal, transactions, prevTransactions);
 }
 
-function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals, prevTotal) {
+function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals, prevTotal, transactions, prevTransactions) {
   const listEl = document.getElementById('home-category-list');
   listEl.innerHTML = '';
 
-  sortedEntries.forEach(([id, amount]) => {
-    const cat = catMap[id];
+  sortedEntries.forEach(([parentId, amount]) => {
+    const cat = catMap[parentId];
     if (!cat) return;
 
+    // この大カテゴリに紐づく全ての小カテゴリ ID を集める
+    const children = Object.values(catMap).filter(c => c.parent_id === parentId);
+    const hasChildren = children.length > 0;
+    // 小カテゴリを使わずに親IDで直接記録している transaction もあるので、それも「未分類」として扱う
+    const hasDirectParent = transactions.some(t => t.category_id === parentId);
+    const isExpandable = hasChildren || hasDirectParent;
+    const isExpanded = state.expandedParents.has(parentId);
+
     const item = document.createElement('div');
-    item.className = 'category-list-item';
+    item.className = 'category-list-item' + (isExpandable ? ' expandable' : '');
 
     const left = document.createElement('div');
     left.className = 'category-list-left';
@@ -638,6 +661,13 @@ function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals,
     left.appendChild(colorMark);
     left.appendChild(name);
 
+    if (isExpandable) {
+      const arrow = document.createElement('span');
+      arrow.className = 'category-arrow' + (isExpanded ? ' expanded' : '');
+      arrow.textContent = '▶';
+      left.appendChild(arrow);
+    }
+
     const amountWrap = document.createElement('div');
     amountWrap.className = 'category-amount-wrap';
 
@@ -645,7 +675,7 @@ function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals,
     amountEl.className = 'category-amount';
     amountEl.textContent = `¥${amount.toLocaleString()}`;
 
-    const prevAmount = prevParentTotals[id] || 0;
+    const prevAmount = prevParentTotals[parentId] || 0;
     const { text: diffText, cssClass } = formatCategoryDiff(amount, prevAmount);
     const diffEl = document.createElement('div');
     diffEl.className = `category-diff ${cssClass}`;
@@ -657,6 +687,28 @@ function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals,
     item.appendChild(left);
     item.appendChild(amountWrap);
     listEl.appendChild(item);
+
+    if (isExpandable) {
+      item.addEventListener('click', () => {
+        if (state.expandedParents.has(parentId)) {
+          state.expandedParents.delete(parentId);
+        } else {
+          state.expandedParents.add(parentId);
+        }
+        // Chart.jsは触らず、リストだけ再描画
+        const d = state.homeRenderData;
+        if (d) {
+          renderCategoryList(d.sortedEntries, d.catMap, d.monthTotal, d.prevParentTotals, d.prevTotal, d.transactions, d.prevTransactions);
+        }
+      });
+    }
+
+    if (isExpanded) {
+      const subList = document.createElement('div');
+      subList.className = 'subcategory-list';
+      renderSubcategoryList(subList, parentId, children, transactions, prevTransactions);
+      listEl.appendChild(subList);
+    }
   });
 
   // 合計行
@@ -687,6 +739,82 @@ function renderCategoryList(sortedEntries, catMap, monthTotal, prevParentTotals,
   totalItem.appendChild(totalLeft);
   totalItem.appendChild(totalAmountWrap);
   listEl.appendChild(totalItem);
+}
+
+function renderSubcategoryList(container, parentId, children, transactions, prevTransactions) {
+  // 小カテゴリごと + 未分類(直接大カテゴリで記録) の集計
+  const sums = {};      // id -> amount（"__parent__" が未分類）
+  const prevSums = {};
+
+  transactions.forEach(t => {
+    if (t.category_id === parentId) {
+      sums['__parent__'] = (sums['__parent__'] || 0) + t.amount;
+    } else if (children.some(c => c.id === t.category_id)) {
+      sums[t.category_id] = (sums[t.category_id] || 0) + t.amount;
+    }
+  });
+
+  prevTransactions.forEach(t => {
+    if (t.category_id === parentId) {
+      prevSums['__parent__'] = (prevSums['__parent__'] || 0) + t.amount;
+    } else if (children.some(c => c.id === t.category_id)) {
+      prevSums[t.category_id] = (prevSums[t.category_id] || 0) + t.amount;
+    }
+  });
+
+  // 表示順: 金額降順、未分類は最後
+  const entries = [];
+  children.forEach(child => {
+    if (sums[child.id]) {
+      entries.push({ id: child.id, name: child.name, amount: sums[child.id], prev: prevSums[child.id] || 0, unclassified: false });
+    }
+  });
+  if (sums['__parent__']) {
+    entries.push({ id: '__parent__', name: '（未分類）', amount: sums['__parent__'], prev: prevSums['__parent__'] || 0, unclassified: true });
+  }
+
+  // 金額降順（未分類は末尾に固定）
+  entries.sort((a, b) => {
+    if (a.unclassified) return 1;
+    if (b.unclassified) return -1;
+    return b.amount - a.amount;
+  });
+
+  if (entries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'subcategory-empty';
+    empty.textContent = '内訳なし';
+    container.appendChild(empty);
+    return;
+  }
+
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'subcategory-item';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'subcategory-name' + (entry.unclassified ? ' unclassified' : '');
+    nameEl.textContent = entry.name;
+
+    const amountWrap = document.createElement('div');
+    amountWrap.className = 'subcategory-amount-wrap';
+
+    const amountEl = document.createElement('div');
+    amountEl.className = 'subcategory-amount';
+    amountEl.textContent = `¥${entry.amount.toLocaleString()}`;
+
+    const { text, cssClass } = formatCategoryDiff(entry.amount, entry.prev);
+    const diffEl = document.createElement('div');
+    diffEl.className = `subcategory-diff ${cssClass}`;
+    diffEl.textContent = text;
+
+    amountWrap.appendChild(amountEl);
+    amountWrap.appendChild(diffEl);
+
+    row.appendChild(nameEl);
+    row.appendChild(amountWrap);
+    container.appendChild(row);
+  });
 }
 
 // ─── 日付モーダル / 入力フォームモーダル ───
@@ -720,7 +848,7 @@ async function renderDateModalBody() {
 
   const categories = await KakeiboDB.getAllCategories();
   const catMap = {};
-  categories.forEach(c => { catMap[c.id] = c.name; });
+  categories.forEach(c => { catMap[c.id] = c; });
 
   body.innerHTML = '';
 
@@ -742,11 +870,22 @@ async function renderDateModalBody() {
   body.appendChild(totalEl);
 
   dateTransactions.forEach(t => {
+    const cat = catMap[t.category_id];
+    let catLabel = '(不明)';
+    if (cat) {
+      if (cat.parent_id) {
+        const parent = catMap[cat.parent_id];
+        catLabel = parent ? `${parent.name} / ${cat.name}` : cat.name;
+      } else {
+        catLabel = cat.name;
+      }
+    }
+
     const card = document.createElement('div');
     card.className = 'record-card';
     card.innerHTML = `
       <div class="record-info">
-        <div class="record-category">${escapeHtml(catMap[t.category_id] || '(不明)')}</div>
+        <div class="record-category">${escapeHtml(catLabel)}</div>
         ${t.memo ? `<div class="record-memo">${escapeHtml(t.memo)}</div>` : ''}
       </div>
       <div class="record-amount">¥${t.amount.toLocaleString()}</div>
@@ -756,16 +895,38 @@ async function renderDateModalBody() {
   });
 }
 
-function openFormModal(dateStr, transaction = null) {
+async function openFormModal(dateStr, transaction = null) {
   state.editingTransactionId = transaction ? transaction.id : null;
 
   document.getElementById('form-title').textContent = transaction ? '編集' : '新規追加';
   document.getElementById('form-delete-btn').style.display = transaction ? 'block' : 'none';
 
   document.getElementById('date-input').value = transaction ? transaction.date : dateStr;
-  document.getElementById('category-select').value = transaction ? transaction.category_id : '';
   document.getElementById('amount-input').value = transaction ? transaction.amount : '';
   document.getElementById('memo-input').value = transaction ? transaction.memo : '';
+
+  // 大カテゴリ/小カテゴリの初期値
+  const catSelect = document.getElementById('category-select');
+  if (transaction) {
+    const cats = await KakeiboDB.getAllCategories();
+    const cat = cats.find(c => c.id === transaction.category_id);
+    if (cat) {
+      if (cat.parent_id === null) {
+        // 大カテゴリを直接指定していた
+        catSelect.value = cat.id;
+        await populateSubcategorySelect(cat.id, '');
+      } else {
+        // 小カテゴリを指定していた
+        catSelect.value = cat.parent_id;
+        await populateSubcategorySelect(cat.parent_id, cat.id);
+      }
+    }
+  } else {
+    // 新規: 大カテゴリの初期値のまま、小カテゴリはなし
+    if (catSelect.value) {
+      await populateSubcategorySelect(catSelect.value, '');
+    }
+  }
 
   document.getElementById('form-modal').classList.add('active');
 }
@@ -777,14 +938,18 @@ function closeFormModal() {
 
 async function handleSave() {
   const date = document.getElementById('date-input').value;
-  const category_id = document.getElementById('category-select').value;
+  const parent_id = document.getElementById('category-select').value;
+  const child_id = document.getElementById('subcategory-select').value;
   const amount = document.getElementById('amount-input').value;
   const memo = document.getElementById('memo-input').value;
 
-  if (!date || !category_id || !amount) {
-    alert('日付・カテゴリ・金額は必須です');
+  if (!date || !parent_id || !amount) {
+    alert('日付・大カテゴリ・金額は必須です');
     return;
   }
+
+  // 小カテゴリ選択があればそちら、なければ大カテゴリ
+  const category_id = child_id || parent_id;
 
   try {
     if (state.editingTransactionId) {
@@ -840,6 +1005,34 @@ async function populateCategorySelect() {
     option.textContent = cat.name;
     select.appendChild(option);
   });
+
+  // 大カテゴリ変更時に小カテゴリを更新
+  select.onchange = () => populateSubcategorySelect(select.value);
+
+  // 初期表示の小カテゴリ
+  if (parentCats.length > 0) {
+    await populateSubcategorySelect(select.value);
+  }
+}
+
+async function populateSubcategorySelect(parentId, selectedChildId = '') {
+  const select = document.getElementById('subcategory-select');
+  if (!select) return;
+
+  const cats = await KakeiboDB.getAllCategories();
+  const children = cats
+    .filter(c => c.parent_id === parentId)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+  select.innerHTML = '<option value="">（なし）</option>';
+  children.forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat.id;
+    option.textContent = cat.name;
+    select.appendChild(option);
+  });
+
+  select.value = selectedChildId;
 }
 
 function setupForm() {
@@ -1226,5 +1419,378 @@ function setupCsvExport() {
     allBtn.addEventListener('click', () => {
       exportAll();
     });
+  }
+}
+
+// ─── カテゴリ管理 ───
+
+const LOCKED_PARENT_CATEGORIES = ['固定費', 'その他'];
+
+function isLockedParentCategory(cat) {
+  return cat.parent_id === null && LOCKED_PARENT_CATEGORIES.includes(cat.name);
+}
+
+async function renderCategoryManagementList() {
+  const listEl = document.getElementById('category-list');
+  if (!listEl) return;
+
+  const cats = await KakeiboDB.getAllCategories();
+  const parents = cats.filter(c => c.parent_id === null);
+  const children = cats.filter(c => c.parent_id !== null);
+
+  // ロックカテゴリは末尾に、それ以外は order 順
+  parents.sort((a, b) => {
+    const aLocked = isLockedParentCategory(a);
+    const bLocked = isLockedParentCategory(b);
+    if (aLocked !== bLocked) return aLocked ? 1 : -1;
+    return (a.order || 0) - (b.order || 0);
+  });
+
+  listEl.innerHTML = '';
+
+  parents.forEach(parent => {
+    const group = document.createElement('div');
+    group.className = 'cat-mgmt-parent';
+
+    const parentRow = document.createElement('div');
+    const isLocked = isLockedParentCategory(parent);
+    parentRow.className = 'cat-mgmt-row' + (isLocked ? ' locked' : '');
+
+    const colorMark = document.createElement('div');
+    colorMark.className = 'category-color-mark';
+    colorMark.style.backgroundColor = getCategoryColor(parent.name);
+    parentRow.appendChild(colorMark);
+
+    const name = document.createElement('div');
+    name.className = 'cat-mgmt-name parent-name';
+    name.textContent = parent.name;
+    parentRow.appendChild(name);
+
+    if (isLocked) {
+      const lockIcon = document.createElement('span');
+      lockIcon.className = 'cat-mgmt-lock-icon';
+      lockIcon.textContent = '🔒';
+      parentRow.appendChild(lockIcon);
+    } else {
+      parentRow.addEventListener('click', () => openCategoryModal(parent));
+    }
+
+    group.appendChild(parentRow);
+
+    const myChildren = children
+      .filter(c => c.parent_id === parent.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    myChildren.forEach(child => {
+      const childRow = document.createElement('div');
+      childRow.className = 'cat-mgmt-child-row';
+
+      const cName = document.createElement('div');
+      cName.className = 'cat-mgmt-name';
+      cName.textContent = '└ ' + child.name;
+      childRow.appendChild(cName);
+
+      childRow.addEventListener('click', () => openCategoryModal(child));
+      group.appendChild(childRow);
+    });
+
+    const addChild = document.createElement('div');
+    addChild.className = 'cat-mgmt-add-child';
+    addChild.textContent = '+ 小カテゴリを追加';
+    addChild.addEventListener('click', () => openCategoryModal(null, 'child', parent.id));
+    group.appendChild(addChild);
+
+    listEl.appendChild(group);
+  });
+}
+
+function setupCategoryModal() {
+  document.getElementById('add-category-btn').addEventListener('click', () => openCategoryModal(null, 'parent'));
+  document.getElementById('category-back-btn').addEventListener('click', closeCategoryModal);
+  document.querySelector('#category-modal .modal-overlay').addEventListener('click', closeCategoryModal);
+  document.getElementById('category-save-btn').addEventListener('click', handleCategorySave);
+  document.getElementById('category-delete-btn').addEventListener('click', handleCategoryDelete);
+
+  document.querySelectorAll('.cat-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchCategoryType(btn.dataset.type));
+  });
+
+  document.getElementById('category-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleCategorySave();
+  });
+}
+
+function switchCategoryType(type) {
+  state.categoryModalType = type;
+  document.querySelectorAll('.cat-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+
+  const parentLabel = document.getElementById('category-parent-label');
+  if (type === 'child') {
+    parentLabel.style.display = '';
+  } else {
+    parentLabel.style.display = 'none';
+  }
+}
+
+async function populateCategoryParentSelect() {
+  const select = document.getElementById('category-parent-select');
+  const cats = await KakeiboDB.getAllCategories();
+  const parents = cats
+    .filter(c => c.parent_id === null)
+    .sort((a, b) => {
+      const aLocked = isLockedParentCategory(a);
+      const bLocked = isLockedParentCategory(b);
+      if (aLocked !== bLocked) return aLocked ? 1 : -1;
+      return (a.order || 0) - (b.order || 0);
+    });
+
+  select.innerHTML = '';
+  parents.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = p.name;
+    select.appendChild(opt);
+  });
+}
+
+async function openCategoryModal(category = null, defaultType = 'parent', defaultParentId = null) {
+  state.editingCategoryId = category ? category.id : null;
+
+  const titleEl = document.getElementById('category-modal-title');
+  const deleteBtn = document.getElementById('category-delete-btn');
+  const typeLabel = document.getElementById('category-type-label');
+  const parentLabel = document.getElementById('category-parent-label');
+  const parentSelect = document.getElementById('category-parent-select');
+  const nameInput = document.getElementById('category-name-input');
+
+  await populateCategoryParentSelect();
+
+  if (category) {
+    // 編集モード
+    titleEl.textContent = 'カテゴリを編集';
+    typeLabel.style.display = 'none';
+
+    if (category.parent_id === null) {
+      parentLabel.style.display = 'none';
+    } else {
+      parentLabel.style.display = '';
+      parentSelect.value = category.parent_id;
+      parentSelect.disabled = true;
+    }
+
+    nameInput.value = category.name;
+    deleteBtn.style.display = 'block';
+  } else {
+    // 新規モード
+    titleEl.textContent = 'カテゴリを追加';
+    typeLabel.style.display = '';
+    parentSelect.disabled = false;
+
+    switchCategoryType(defaultType);
+    if (defaultParentId) {
+      parentSelect.value = defaultParentId;
+    }
+
+    nameInput.value = '';
+    deleteBtn.style.display = 'none';
+  }
+
+  document.getElementById('category-modal').classList.add('active');
+}
+
+function closeCategoryModal() {
+  document.getElementById('category-modal').classList.remove('active');
+  state.editingCategoryId = null;
+  const parentSelect = document.getElementById('category-parent-select');
+  if (parentSelect) parentSelect.disabled = false;
+}
+
+async function handleCategorySave() {
+  const name = document.getElementById('category-name-input').value.trim();
+  if (!name) {
+    alert('名前を入力してください');
+    return;
+  }
+
+  try {
+    const cats = await KakeiboDB.getAllCategories();
+
+    if (state.editingCategoryId) {
+      // 編集
+      const existing = cats.find(c => c.id === state.editingCategoryId);
+      if (!existing) throw new Error('カテゴリが見つかりません');
+
+      const dup = cats.find(c =>
+        c.id !== state.editingCategoryId &&
+        c.parent_id === existing.parent_id &&
+        c.name === name
+      );
+      if (dup) {
+        alert('同じ名前のカテゴリが既に存在します');
+        return;
+      }
+
+      existing.name = name;
+      await KakeiboDB.put(KakeiboDB.STORES.categories, existing);
+    } else {
+      // 新規
+      if (state.categoryModalType === 'parent') {
+        const dup = cats.find(c => c.parent_id === null && c.name === name);
+        if (dup) {
+          alert('同じ名前の大カテゴリが既に存在します');
+          return;
+        }
+        await KakeiboDB.addCategory({ name, parent_id: null });
+      } else {
+        const parentId = document.getElementById('category-parent-select').value;
+        if (!parentId) {
+          alert('親カテゴリを選択してください');
+          return;
+        }
+        const dup = cats.find(c => c.parent_id === parentId && c.name === name);
+        if (dup) {
+          alert('同じ親カテゴリの下に同名の小カテゴリが既に存在します');
+          return;
+        }
+        await KakeiboDB.addCategory({ name, parent_id: parentId });
+      }
+    }
+
+    closeCategoryModal();
+    await populateCategorySelect();
+    await renderCategoryManagementList();
+    await renderRecurringList();
+    await renderCalendar();
+    await renderHome();
+  } catch (err) {
+    console.error('カテゴリ保存エラー:', err);
+    alert('保存に失敗しました: ' + err.message);
+  }
+}
+
+async function handleCategoryDelete() {
+  if (!state.editingCategoryId) return;
+
+  const cats = await KakeiboDB.getAllCategories();
+  const cat = cats.find(c => c.id === state.editingCategoryId);
+  if (!cat) return;
+
+  if (isLockedParentCategory(cat)) {
+    alert(`「${cat.name}」は削除できません`);
+    return;
+  }
+
+  const allTrans = await KakeiboDB.getAll(KakeiboDB.STORES.transactions);
+  const templates = await KakeiboDB.getAllRecurring();
+
+  let affectedRecords = 0;
+  let affectedTemplates = 0;
+  let childCount = 0;
+
+  if (cat.parent_id === null) {
+    const children = cats.filter(c => c.parent_id === cat.id);
+    childCount = children.length;
+    const allAffectedIds = [cat.id, ...children.map(c => c.id)];
+    affectedRecords = allTrans.filter(t => allAffectedIds.includes(t.category_id)).length;
+    affectedTemplates = templates.filter(t => allAffectedIds.includes(t.category_id)).length;
+  } else {
+    affectedRecords = allTrans.filter(t => t.category_id === cat.id).length;
+    affectedTemplates = templates.filter(t => t.category_id === cat.id).length;
+  }
+
+  let msg = `「${cat.name}」を削除しますか？\n\n`;
+  if (childCount > 0) {
+    msg += `・小カテゴリ ${childCount}個 も一緒に削除\n`;
+  }
+  if (affectedRecords > 0) {
+    if (cat.parent_id === null) {
+      msg += `・記録 ${affectedRecords}件 は「その他」に移動\n`;
+    } else {
+      const parent = cats.find(c => c.id === cat.parent_id);
+      msg += `・記録 ${affectedRecords}件 は「${parent ? parent.name : '親カテゴリ'}」に移動\n`;
+    }
+  }
+  if (affectedTemplates > 0) {
+    msg += `・固定費テンプレート ${affectedTemplates}件 も削除\n`;
+  }
+  if (childCount === 0 && affectedRecords === 0 && affectedTemplates === 0) {
+    msg += `（使用中のレコード・小カテゴリなし）\n`;
+  }
+
+  if (!confirm(msg)) return;
+
+  try {
+    await deleteCategoryWithReassign(cat.id);
+    closeCategoryModal();
+    await populateCategorySelect();
+    await renderCategoryManagementList();
+    await renderRecurringList();
+    await renderCalendar();
+    await renderHome();
+  } catch (err) {
+    console.error('カテゴリ削除エラー:', err);
+    alert('削除に失敗しました: ' + err.message);
+  }
+}
+
+async function deleteCategoryWithReassign(categoryId) {
+  const cats = await KakeiboDB.getAllCategories();
+  const cat = cats.find(c => c.id === categoryId);
+  if (!cat) return;
+
+  if (isLockedParentCategory(cat)) {
+    throw new Error(`「${cat.name}」は削除できません`);
+  }
+
+  const allTrans = await KakeiboDB.getAll(KakeiboDB.STORES.transactions);
+  const templates = await KakeiboDB.getAllRecurring();
+
+  if (cat.parent_id === null) {
+    // 大カテゴリ削除
+    const other = cats.find(c => c.parent_id === null && c.name === 'その他');
+    if (!other) throw new Error('「その他」カテゴリが見つかりません');
+
+    const children = cats.filter(c => c.parent_id === cat.id);
+    const allAffectedIds = [cat.id, ...children.map(c => c.id)];
+
+    // レコード付け替え
+    const affectedTrans = allTrans.filter(t => allAffectedIds.includes(t.category_id));
+    for (const t of affectedTrans) {
+      t.category_id = other.id;
+      await KakeiboDB.updateTransaction(t);
+    }
+
+    // 固定費テンプレート削除
+    const affectedTemplates = templates.filter(t => allAffectedIds.includes(t.category_id));
+    for (const template of affectedTemplates) {
+      await KakeiboDB.deleteRecurring(template.id);
+    }
+
+    // 子カテゴリ削除
+    for (const child of children) {
+      await KakeiboDB.deleteCategory(child.id);
+    }
+
+    // 自分を削除
+    await KakeiboDB.deleteCategory(cat.id);
+  } else {
+    // 小カテゴリ削除
+    const parentId = cat.parent_id;
+
+    const affectedTrans = allTrans.filter(t => t.category_id === cat.id);
+    for (const t of affectedTrans) {
+      t.category_id = parentId;
+      await KakeiboDB.updateTransaction(t);
+    }
+
+    const affectedTemplates = templates.filter(t => t.category_id === cat.id);
+    for (const template of affectedTemplates) {
+      await KakeiboDB.deleteRecurring(template.id);
+    }
+
+    await KakeiboDB.deleteCategory(cat.id);
   }
 }
