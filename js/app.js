@@ -11,9 +11,55 @@ const state = {
   homeChart: null,
 };
 
+// ─── カテゴリ色 ───
+
+// くすんだ落ち着いたカラーパレット
+const CATEGORY_COLOR_PALETTE = [
+  '#7a9b7e', // くすんだ緑
+  '#6b8caf', // くすんだ青
+  '#b58471', // くすんだテラコッタ
+  '#8b7ba5', // くすんだ紫
+  '#b8a870', // くすんだ黄土色
+  '#8b7355', // くすんだブラウン
+  '#8f8f8f', // くすんだグレー
+  '#b58097', // くすんだピンク
+  '#7ba5a5', // くすんだシアン
+  '#9b9b6f', // くすんだオリーブ
+];
+
+// デフォルトカテゴリの固定色マップ
+const DEFAULT_CATEGORY_COLORS = {
+  '食費': 0,      // 緑
+  '交通費': 1,    // 青
+  '日用品': 2,    // テラコッタ
+  '娯楽': 3,      // 紫
+  '光熱費': 4,    // 黄土色
+  '固定費': 5,    // ブラウン
+  'その他': 6,    // グレー
+};
+
+/**
+ * カテゴリ名から色を取得
+ * - デフォルトカテゴリは固定色
+ * - それ以外は名前のハッシュで決定的に選ぶ
+ */
+function getCategoryColor(name) {
+  if (DEFAULT_CATEGORY_COLORS.hasOwnProperty(name)) {
+    return CATEGORY_COLOR_PALETTE[DEFAULT_CATEGORY_COLORS[name]];
+  }
+  // 未知のカテゴリは名前ハッシュから選ぶ（同じ名前なら常に同じ色）
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
+  }
+  const index = Math.abs(hash) % CATEGORY_COLOR_PALETTE.length;
+  return CATEGORY_COLOR_PALETTE[index];
+}
+
+// ─── 初期化 ───
+
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // バージョン表示
     document.getElementById('version-badge').textContent = window.APP_VERSION || 'v?';
 
     await KakeiboDB.initDefaultCategories();
@@ -31,6 +77,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     alert('初期化に失敗しました: ' + err.message);
   }
 });
+
+// ─── 共通ユーティリティ ───
 
 function getTodayString() {
   const d = new Date();
@@ -66,6 +114,8 @@ function getAmountFontSize(amount) {
   if (len <= 8) return '8px';
   return '7px';
 }
+
+// ─── タブ切り替え ───
 
 function setupTabNavigation() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -281,7 +331,8 @@ async function renderHome() {
   const labels = sortedEntries.map(([id]) => catMap[id]?.name || '(不明)');
   const values = sortedEntries.map(([, amt]) => amt);
 
-  const colors = generateGrayscaleColors(labels.length);
+  // カテゴリ名から固定色を取得
+  const colors = labels.map(name => getCategoryColor(name));
 
   if (state.homeChart) {
     state.homeChart.destroy();
@@ -295,14 +346,14 @@ async function renderHome() {
       datasets: [{
         data: values,
         backgroundColor: colors,
-        borderWidth: 0,  // 白い区切り線をなくす
+        borderWidth: 0,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: true,
       layout: {
-        padding: 4,  // 引き出し線なくしたので最小限
+        padding: 4,
       },
       plugins: {
         legend: {
@@ -328,7 +379,7 @@ async function renderHome() {
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
-        // 10%以上のカテゴリのみ扇内にラベル表示
+        // 10%以上のカテゴリのみ扇内にラベル表示、文字は白統一
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
           const percent = (value / total) * 100;
@@ -345,11 +396,11 @@ async function renderHome() {
           const labelX = x + Math.cos(midAngle) * radius;
           const labelY = y + Math.sin(midAngle) * radius;
 
-          const bgColor = data.datasets[0].backgroundColor[i];
-          const textColor = getContrastColor(bgColor);
-
           ctx.save();
-          ctx.fillStyle = textColor;
+          // 文字を読みやすく: 白文字 + 薄い黒シャドウ
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+          ctx.shadowBlur = 3;
+          ctx.fillStyle = '#ffffff';
           ctx.font = 'bold 16px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
@@ -394,25 +445,6 @@ function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
     `;
     listEl.appendChild(item);
   });
-}
-
-function generateGrayscaleColors(n) {
-  const colors = [];
-  const min = 60;
-  const max = 200;
-  for (let i = 0; i < n; i++) {
-    const value = n === 1 ? 130 : Math.round(min + (max - min) * (i / (n - 1)));
-    colors.push(`rgb(${value}, ${value}, ${value})`);
-  }
-  return colors;
-}
-
-function getContrastColor(rgbStr) {
-  const match = rgbStr.match(/\d+/g);
-  if (!match) return '#000000';
-  const [r, g, b] = match.map(Number);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness > 128 ? '#000000' : '#ffffff';
 }
 
 // ─── モーダル ───
