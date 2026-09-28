@@ -13,7 +13,6 @@ const state = {
 
 // ─── カテゴリ色 ───
 
-// くすんだ落ち着いたカラーパレット
 const CATEGORY_COLOR_PALETTE = [
   '#7a9b7e', // くすんだ緑
   '#6b8caf', // くすんだ青
@@ -27,27 +26,20 @@ const CATEGORY_COLOR_PALETTE = [
   '#9b9b6f', // くすんだオリーブ
 ];
 
-// デフォルトカテゴリの固定色マップ
 const DEFAULT_CATEGORY_COLORS = {
-  '食費': 0,      // 緑
-  '交通費': 1,    // 青
-  '日用品': 2,    // テラコッタ
-  '娯楽': 3,      // 紫
-  '光熱費': 4,    // 黄土色
-  '固定費': 5,    // ブラウン
-  'その他': 6,    // グレー
+  '食費': 0,
+  '交通費': 1,
+  '日用品': 2,
+  '娯楽': 3,
+  '光熱費': 4,
+  '固定費': 5,
+  'その他': 6,
 };
 
-/**
- * カテゴリ名から色を取得
- * - デフォルトカテゴリは固定色
- * - それ以外は名前のハッシュで決定的に選ぶ
- */
 function getCategoryColor(name) {
   if (DEFAULT_CATEGORY_COLORS.hasOwnProperty(name)) {
     return CATEGORY_COLOR_PALETTE[DEFAULT_CATEGORY_COLORS[name]];
   }
-  // 未知のカテゴリは名前ハッシュから選ぶ（同じ名前なら常に同じ色）
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
     hash = (hash * 31 + name.charCodeAt(i)) & 0xffffffff;
@@ -102,6 +94,54 @@ function getMonthRange(year, month) {
   const lastDay = new Date(year, month, 0).getDate();
   const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   return { startDate, endDate, lastDay };
+}
+
+/**
+ * 前月の年月を取得
+ */
+function getPrevMonth(year, month) {
+  if (month === 1) {
+    return { year: year - 1, month: 12 };
+  }
+  return { year, month: month - 1 };
+}
+
+/**
+ * 前月の合計金額を取得
+ */
+async function getPrevMonthTotal(year, month) {
+  const prev = getPrevMonth(year, month);
+  const range = getMonthRange(prev.year, prev.month);
+  const transactions = await KakeiboDB.getTransactionsByPeriod(range.startDate, range.endDate);
+  return transactions.reduce((sum, t) => sum + t.amount, 0);
+}
+
+/**
+ * 前月比の表示テキストとCSSクラスを返す
+ * 前月データがない（0円）場合は「前月比: -」を返す
+ */
+function formatMonthDiff(currentTotal, prevTotal) {
+  if (prevTotal === 0) {
+    return { text: '前月比 -', cssClass: 'same' };
+  }
+  const diff = currentTotal - prevTotal;
+  if (diff > 0) {
+    return { text: `前月比 +${diff.toLocaleString()}円 ↑`, cssClass: 'increase' };
+  } else if (diff < 0) {
+    return { text: `前月比 ${diff.toLocaleString()}円 ↓`, cssClass: 'decrease' };
+  } else {
+    return { text: '前月比 ±0円', cssClass: 'same' };
+  }
+}
+
+/**
+ * 前月比表示を更新する
+ */
+function updateMonthDiff(elementId, currentTotal, prevTotal) {
+  const el = document.getElementById(elementId);
+  const { text, cssClass } = formatMonthDiff(currentTotal, prevTotal);
+  el.textContent = text;
+  el.className = `month-diff ${cssClass}`;
 }
 
 function getAmountFontSize(amount) {
@@ -189,6 +229,10 @@ async function renderCalendar() {
 
   const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
   document.getElementById('month-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
+
+  // 前月比を更新
+  const prevTotal = await getPrevMonthTotal(y, m);
+  updateMonthDiff('calendar-month-diff', monthTotal, prevTotal);
 
   const container = document.getElementById('calendar-container');
   container.innerHTML = '';
@@ -297,6 +341,10 @@ async function renderHome() {
   const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
   document.getElementById('home-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
 
+  // 前月比を更新
+  const prevTotal = await getPrevMonthTotal(y, m);
+  updateMonthDiff('home-month-diff', monthTotal, prevTotal);
+
   const emptyEl = document.getElementById('home-empty');
   const canvasEl = document.getElementById('home-chart');
   const listEl = document.getElementById('home-category-list');
@@ -331,7 +379,6 @@ async function renderHome() {
   const labels = sortedEntries.map(([id]) => catMap[id]?.name || '(不明)');
   const values = sortedEntries.map(([, amt]) => amt);
 
-  // カテゴリ名から固定色を取得
   const colors = labels.map(name => getCategoryColor(name));
 
   if (state.homeChart) {
@@ -379,7 +426,6 @@ async function renderHome() {
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
-        // 10%以上のカテゴリのみ扇内にラベル表示、文字は白統一
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
           const percent = (value / total) * 100;
@@ -397,7 +443,6 @@ async function renderHome() {
           const labelY = y + Math.sin(midAngle) * radius;
 
           ctx.save();
-          // 文字を読みやすく: 白文字 + 薄い黒シャドウ
           ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
           ctx.shadowBlur = 3;
           ctx.fillStyle = '#ffffff';
@@ -411,7 +456,6 @@ async function renderHome() {
     }],
   });
 
-  // カテゴリ一覧を描画
   renderCategoryList(sortedEntries, catMap, colors, monthTotal);
 }
 
@@ -419,7 +463,6 @@ function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
   const listEl = document.getElementById('home-category-list');
   listEl.innerHTML = '';
 
-  // 合計行
   const totalItem = document.createElement('div');
   totalItem.className = 'category-list-item total';
   totalItem.innerHTML = `
@@ -430,7 +473,6 @@ function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
   `;
   listEl.appendChild(totalItem);
 
-  // 各カテゴリ
   sortedEntries.forEach(([id, amount], i) => {
     const name = catMap[id]?.name || '(不明)';
     const color = colors[i];

@@ -141,6 +141,25 @@ header h1 {
   color: #333333;
 }
 
+/* 前月比表示 */
+.month-diff {
+  font-size: 13px;
+  margin-top: 4px;
+  color: #999999;
+}
+
+.month-diff.increase {
+  color: #cc0000;
+}
+
+.month-diff.decrease {
+  color: #0066cc;
+}
+
+.month-diff.same {
+  color: #999999;
+}
+
 .chart-container {
   position: relative;
   width: 90%;
