@@ -58,7 +58,7 @@ function getCategoryColor(name) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    document.getElementById('version-badge').textContent = window.APP_VERSION || 'v?';
+    // document.getElementById('version-badge').textContent = window.APP_VERSION || 'v?';
 
     await KakeiboDB.initDefaultCategories();
     await populateCategorySelect();
@@ -996,6 +996,7 @@ async function populateCategorySelect() {
   const cats = await KakeiboDB.getAllCategories();
   const parentCats = cats
     .filter(c => c.parent_id === null)
+    .filter(c => !isHiddenParentCategory(c))  // 固定費除外
     .sort((a, b) => a.order - b.order);
 
   select.innerHTML = '';
@@ -1424,7 +1425,12 @@ function setupCsvExport() {
 
 // ─── カテゴリ管理 ───
 
-const LOCKED_PARENT_CATEGORIES = ['固定費', 'その他'];
+const HIDDEN_PARENT_CATEGORIES = ['固定費'];  // カテゴリ管理から非表示
+const LOCKED_PARENT_CATEGORIES = ['固定費', 'その他'];  // 削除・名前変更不可
+
+function isHiddenParentCategory(cat) {
+  return cat.parent_id === null && HIDDEN_PARENT_CATEGORIES.includes(cat.name);
+}
 
 function isLockedParentCategory(cat) {
   return cat.parent_id === null && LOCKED_PARENT_CATEGORIES.includes(cat.name);
@@ -1435,7 +1441,9 @@ async function renderCategoryManagementList() {
   if (!listEl) return;
 
   const cats = await KakeiboDB.getAllCategories();
-  const parents = cats.filter(c => c.parent_id === null);
+  const parents = cats
+    .filter(c => c.parent_id === null)
+    .filter(c => !isHiddenParentCategory(c)); // 「固定費」を非表示
   const children = cats.filter(c => c.parent_id !== null);
 
   // ロックカテゴリは末尾に、それ以外は order 順
@@ -1540,6 +1548,7 @@ async function populateCategoryParentSelect() {
   const cats = await KakeiboDB.getAllCategories();
   const parents = cats
     .filter(c => c.parent_id === null)
+    .filter(c => !isHiddenParentCategory(c)) // 「固定費」を除外
     .sort((a, b) => {
       const aLocked = isLockedParentCategory(a);
       const bLocked = isLockedParentCategory(b);
