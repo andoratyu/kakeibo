@@ -97,6 +97,9 @@
     </button>
   </nav>
 
+  <!-- バージョン表示（右下） -->
+  <div id="version-badge">v-</div>
+
   <!-- 日付モーダル -->
   <div id="date-modal" class="modal">
     <div class="modal-overlay"></div>
@@ -105,9 +108,7 @@
         <h2 id="modal-date-title">9月18日（水）</h2>
         <button id="modal-close" class="modal-close">✕</button>
       </div>
-      <div class="modal-body" id="modal-body">
-        <!-- JS で描画 -->
-      </div>
+      <div class="modal-body" id="modal-body"></div>
       <div class="modal-footer">
         <button id="add-transaction-btn" class="primary-btn">+ 新規追加</button>
       </div>
@@ -151,6 +152,7 @@
   <!-- Chart.js（CDN） -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
+  <script src="js/version.js"></script>
   <script src="js/db.js"></script>
   <script src="js/holidays.js"></script>
   <script src="js/app.js"></script>

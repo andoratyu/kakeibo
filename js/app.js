@@ -1,6 +1,5 @@
 // app.js — メインロジック
 
-// 状態管理
 const state = {
   currentPage: 'calendar',
   currentYear: new Date().getFullYear(),
@@ -12,9 +11,11 @@ const state = {
   homeChart: null,
 };
 
-// ─── 初期化 ───
 document.addEventListener('DOMContentLoaded', async () => {
   try {
+    // バージョン表示
+    document.getElementById('version-badge').textContent = window.APP_VERSION || 'v?';
+
     await KakeiboDB.initDefaultCategories();
     await populateCategorySelect();
     setupTabNavigation();
@@ -24,14 +25,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupForm();
     await renderCalendar();
     await renderHome();
-    console.log('app.js 初期化完了');
+    console.log('app.js 初期化完了 バージョン:', window.APP_VERSION);
   } catch (err) {
     console.error('初期化エラー:', err);
     alert('初期化に失敗しました: ' + err.message);
   }
 });
-
-// ─── 共通ユーティリティ ───
 
 function getTodayString() {
   const d = new Date();
@@ -58,19 +57,18 @@ function getMonthRange(year, month) {
 }
 
 /**
- * 桁数に応じてカレンダーマス用のフォントサイズを決める
+ * カレンダーマス用のフォントサイズを動的に決める（より小さめに）
  */
 function getAmountFontSize(amount) {
   const text = `${amount.toLocaleString()}円`;
   const len = text.length;
-  if (len <= 5) return '13px';   // 500円
-  if (len <= 6) return '12px';   // 5,000円
-  if (len <= 7) return '11px';   // 10,000円
-  if (len <= 8) return '10px';   // 100,000円
-  return '9px';                  // 1,000,000円以上
+  if (len <= 4) return '12px';   // 999円 (4文字)
+  if (len <= 5) return '11px';   // 5000円
+  if (len <= 6) return '10px';   // 5,000円
+  if (len <= 7) return '9px';    // 10,000円
+  if (len <= 8) return '8px';    // 100,000円
+  return '7px';                  // 1,000,000円以上
 }
-
-// ─── タブ切り替え ───
 
 function setupTabNavigation() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -100,7 +98,7 @@ async function switchPage(pageId) {
   }
 }
 
-// ─── カレンダー画面 ───
+// ─── カレンダー ───
 
 function setupCalendarNavigation() {
   document.getElementById('prev-month').addEventListener('click', () => {
@@ -211,7 +209,7 @@ async function renderCalendar() {
   }
 }
 
-// ─── ホーム画面 ───
+// ─── ホーム ───
 
 function setupHomeNavigation() {
   document.getElementById('home-prev-month').addEventListener('click', () => {
@@ -291,8 +289,8 @@ async function renderHome() {
   }
 
   const isMobile = window.innerWidth < 600;
-  // padding: 引き出し線とラベル分の余白確保（円は切れないサイズに）
-  const padding = isMobile ? 65 : 90;
+  // 円が切れないように十分なpadding
+  const padding = isMobile ? 70 : 90;
 
   const ctx = canvasEl.getContext('2d');
   state.homeChart = new Chart(ctx, {
@@ -341,18 +339,17 @@ async function renderHome() {
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
-        // 大きい扇: 扇内にラベル
+        // 大きい扇（8%以上）: 扇内にラベル
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
           const percent = (value / total) * 100;
-          const label = data.labels[i];
+          if (percent < 8) return;
 
+          const label = data.labels[i];
           const { x, y, startAngle, endAngle, outerRadius, innerRadius } = arc.getProps(
             ['x', 'y', 'startAngle', 'endAngle', 'outerRadius', 'innerRadius'],
             true
           );
-
-          if (percent < 8) return;
 
           const midAngle = (startAngle + endAngle) / 2;
           const radius = (outerRadius + innerRadius) / 2;
@@ -371,7 +368,7 @@ async function renderHome() {
           ctx.restore();
         });
 
-        // 小さい扇: 引き出し線で外に（円周から一定距離、短めに）
+        // 小さい扇（8%未満）: 引き出し線で外に、円周から短く
         const smallLabels = [];
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
@@ -387,13 +384,12 @@ async function renderHome() {
           const startY = y + Math.sin(midAngle) * outerRadius;
           const isRight = Math.cos(midAngle) >= 0;
 
-          // 円周から10px外に折れ点
-          const bendX = x + Math.cos(midAngle) * (outerRadius + 10);
-          const bendY = y + Math.sin(midAngle) * (outerRadius + 10);
+          // 円周から短い折れ点（8px外）
+          const bendX = x + Math.cos(midAngle) * (outerRadius + 8);
+          const bendY = y + Math.sin(midAngle) * (outerRadius + 8);
 
-          // 水平線終端: 円中心から外側に一定距離（円半径 + 35px）
-          const horizontalReach = outerRadius + 35;
-          const endX = isRight ? x + horizontalReach : x - horizontalReach;
+          // 水平線終端: 折れ点から水平方向にわずかに（20pxだけ）
+          const endX = isRight ? bendX + 20 : bendX - 20;
           const endY = bendY;
 
           smallLabels.push({
@@ -409,8 +405,8 @@ async function renderHome() {
         const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
         const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
 
-        adjustLabelYPositions(rightLabels, 22);
-        adjustLabelYPositions(leftLabels, 22);
+        adjustLabelYPositions(rightLabels, 20);
+        adjustLabelYPositions(leftLabels, 20);
 
         [...rightLabels, ...leftLabels].forEach(l => {
           ctx.save();
@@ -423,7 +419,7 @@ async function renderHome() {
           ctx.stroke();
 
           ctx.fillStyle = '#333333';
-          ctx.font = '13px sans-serif';
+          ctx.font = 'bold 12px sans-serif';
           ctx.textAlign = l.isRight ? 'left' : 'right';
           ctx.textBaseline = 'middle';
           const textOffsetX = l.isRight ? 4 : -4;
@@ -464,7 +460,7 @@ function getContrastColor(rgbStr) {
   return brightness > 128 ? '#000000' : '#ffffff';
 }
 
-// ─── モーダル管理 ───
+// ─── モーダル ───
 
 function setupModals() {
   document.getElementById('modal-close').addEventListener('click', closeDateModal);
@@ -600,8 +596,6 @@ async function handleDelete() {
     alert('削除に失敗しました: ' + err.message);
   }
 }
-
-// ─── フォーム関連 ───
 
 async function populateCategorySelect() {
   const select = document.getElementById('category-select');
