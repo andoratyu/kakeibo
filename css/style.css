@@ -141,7 +141,7 @@ header h1 {
   color: #333333;
 }
 
-/* 前月比表示 */
+/* 前月比表示（上部） */
 .month-diff {
   font-size: 13px;
   margin-top: 4px;
@@ -183,14 +183,13 @@ header h1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 8px;
+  padding: 12px 8px;
   border-bottom: 1px solid #e0e0e0;
   gap: 12px;
 }
 
 .category-list-item.total {
   font-weight: bold;
-  font-size: 16px;
 }
 
 .category-list-left {
@@ -215,10 +214,45 @@ header h1 {
   white-space: nowrap;
 }
 
+/* 右側：金額 + 増減 */
+.category-amount-wrap {
+  text-align: right;
+  min-width: 0;
+}
+
 .category-amount {
   font-size: 15px;
   font-weight: bold;
   white-space: nowrap;
+}
+
+.category-list-item.total .category-amount {
+  font-size: 16px;
+}
+
+.category-diff {
+  font-size: 11px;
+  margin-top: 2px;
+  color: #999999;
+  white-space: nowrap;
+  font-weight: normal;
+}
+
+.category-diff.increase {
+  color: #cc0000;
+}
+
+.category-diff.decrease {
+  color: #0066cc;
+}
+
+.category-diff.same {
+  color: #999999;
+}
+
+.category-diff.new {
+  color: #666666;
+  font-style: italic;
 }
 
 /* ─── カレンダー ─── */

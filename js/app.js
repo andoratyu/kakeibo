@@ -96,9 +96,6 @@ function getMonthRange(year, month) {
   return { startDate, endDate, lastDay };
 }
 
-/**
- * 前月の年月を取得
- */
 function getPrevMonth(year, month) {
   if (month === 1) {
     return { year: year - 1, month: 12 };
@@ -107,35 +104,66 @@ function getPrevMonth(year, month) {
 }
 
 /**
- * 前月の合計金額を取得
+ * 前月の取引データを取得
  */
-async function getPrevMonthTotal(year, month) {
+async function getPrevMonthTransactions(year, month) {
   const prev = getPrevMonth(year, month);
   const range = getMonthRange(prev.year, prev.month);
-  const transactions = await KakeiboDB.getTransactionsByPeriod(range.startDate, range.endDate);
-  return transactions.reduce((sum, t) => sum + t.amount, 0);
+  return await KakeiboDB.getTransactionsByPeriod(range.startDate, range.endDate);
 }
 
 /**
- * 前月比の表示テキストとCSSクラスを返す
- * 前月データがない（0円）場合は「前月比: -」を返す
+ * 前月比の全体表示テキストとCSSクラスを返す（比率つき）
  */
 function formatMonthDiff(currentTotal, prevTotal) {
   if (prevTotal === 0) {
     return { text: '前月比 -', cssClass: 'same' };
   }
   const diff = currentTotal - prevTotal;
-  if (diff > 0) {
-    return { text: `前月比 +${diff.toLocaleString()}円 ↑`, cssClass: 'increase' };
-  } else if (diff < 0) {
-    return { text: `前月比 ${diff.toLocaleString()}円 ↓`, cssClass: 'decrease' };
-  } else {
+  if (diff === 0) {
     return { text: '前月比 ±0円', cssClass: 'same' };
+  }
+  const percent = Math.round((diff / prevTotal) * 100);
+  if (diff > 0) {
+    return {
+      text: `前月比 +${diff.toLocaleString()}円 ↑ (+${percent}%)`,
+      cssClass: 'increase',
+    };
+  } else {
+    return {
+      text: `前月比 ${diff.toLocaleString()}円 ↓ (${percent}%)`,
+      cssClass: 'decrease',
+    };
   }
 }
 
 /**
- * 前月比表示を更新する
+ * カテゴリ別の前月比表示（合計行もこれを使う）
+ */
+function formatCategoryDiff(current, prev) {
+  if (prev === 0) {
+    return { text: '新規', cssClass: 'new' };
+  }
+  const diff = current - prev;
+  if (diff === 0) {
+    return { text: '±0円', cssClass: 'same' };
+  }
+  const percent = Math.round((diff / prev) * 100);
+  if (diff > 0) {
+    return {
+      text: `+${diff.toLocaleString()}円 ↑ (+${percent}%)`,
+      cssClass: 'increase',
+    };
+  } else {
+    return {
+      text: `${diff.toLocaleString()}円 ↓ (${percent}%)`,
+      cssClass: 'decrease',
+    };
+  }
+}
+
+/**
+ * 前月比表示（画面上部の合計の下）
  */
 function updateMonthDiff(elementId, currentTotal, prevTotal) {
   const el = document.getElementById(elementId);
@@ -231,7 +259,8 @@ async function renderCalendar() {
   document.getElementById('month-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
 
   // 前月比を更新
-  const prevTotal = await getPrevMonthTotal(y, m);
+  const prevTransactions = await getPrevMonthTransactions(y, m);
+  const prevTotal = prevTransactions.reduce((sum, t) => sum + t.amount, 0);
   updateMonthDiff('calendar-month-diff', monthTotal, prevTotal);
 
   const container = document.getElementById('calendar-container');
@@ -329,6 +358,20 @@ function setupHomeNavigation() {
   });
 }
 
+/**
+ * 取引配列から大カテゴリ別の合計を計算
+ */
+function calcParentTotals(transactions, catMap) {
+  const totals = {};
+  transactions.forEach(t => {
+    const cat = catMap[t.category_id];
+    if (!cat) return;
+    const parentId = cat.parent_id || cat.id;
+    totals[parentId] = (totals[parentId] || 0) + t.amount;
+  });
+  return totals;
+}
+
 async function renderHome() {
   const { homeYear: y, homeMonth: m } = state;
 
@@ -337,12 +380,16 @@ async function renderHome() {
   const { startDate, endDate } = getMonthRange(y, m);
   const transactions = await KakeiboDB.getTransactionsByPeriod(startDate, endDate);
   const categories = await KakeiboDB.getAllCategories();
+  const prevTransactions = await getPrevMonthTransactions(y, m);
+
+  const catMap = {};
+  categories.forEach(c => { catMap[c.id] = c; });
 
   const monthTotal = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const prevTotal = prevTransactions.reduce((sum, t) => sum + t.amount, 0);
   document.getElementById('home-total-amount').textContent = `¥${monthTotal.toLocaleString()}`;
 
-  // 前月比を更新
-  const prevTotal = await getPrevMonthTotal(y, m);
+  // 上部の前月比を更新（比率つき）
   updateMonthDiff('home-month-diff', monthTotal, prevTotal);
 
   const emptyEl = document.getElementById('home-empty');
@@ -363,16 +410,8 @@ async function renderHome() {
   emptyEl.style.display = 'none';
   canvasEl.style.display = 'block';
 
-  const catMap = {};
-  categories.forEach(c => { catMap[c.id] = c; });
-
-  const parentTotals = {};
-  transactions.forEach(t => {
-    const cat = catMap[t.category_id];
-    if (!cat) return;
-    const parentId = cat.parent_id || cat.id;
-    parentTotals[parentId] = (parentTotals[parentId] || 0) + t.amount;
-  });
+  const parentTotals = calcParentTotals(transactions, catMap);
+  const prevParentTotals = calcParentTotals(prevTransactions, catMap);
 
   const sortedEntries = Object.entries(parentTotals).sort((a, b) => b[1] - a[1]);
 
@@ -456,26 +495,35 @@ async function renderHome() {
     }],
   });
 
-  renderCategoryList(sortedEntries, catMap, colors, monthTotal);
+  renderCategoryList(sortedEntries, catMap, colors, monthTotal, prevParentTotals, prevTotal);
 }
 
-function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
+function renderCategoryList(sortedEntries, catMap, colors, monthTotal, prevParentTotals, prevTotal) {
   const listEl = document.getElementById('home-category-list');
   listEl.innerHTML = '';
 
+  // 合計行
+  const totalDiff = formatCategoryDiff(monthTotal, prevTotal);
   const totalItem = document.createElement('div');
   totalItem.className = 'category-list-item total';
   totalItem.innerHTML = `
     <div class="category-list-left">
       <span class="category-name">合計</span>
     </div>
-    <span class="category-amount">${monthTotal.toLocaleString()}円</span>
+    <div class="category-amount-wrap">
+      <div class="category-amount">${monthTotal.toLocaleString()}円</div>
+      <div class="category-diff ${totalDiff.cssClass}">${totalDiff.text}</div>
+    </div>
   `;
   listEl.appendChild(totalItem);
 
+  // 各カテゴリ
   sortedEntries.forEach(([id, amount], i) => {
     const name = catMap[id]?.name || '(不明)';
     const color = colors[i];
+    const prevAmount = prevParentTotals[id] || 0;
+    const diff = formatCategoryDiff(amount, prevAmount);
+
     const item = document.createElement('div');
     item.className = 'category-list-item';
     item.innerHTML = `
@@ -483,7 +531,10 @@ function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
         <span class="category-color-mark" style="background-color: ${color};"></span>
         <span class="category-name">${escapeHtml(name)}</span>
       </div>
-      <span class="category-amount">${amount.toLocaleString()}円</span>
+      <div class="category-amount-wrap">
+        <div class="category-amount">${amount.toLocaleString()}円</div>
+        <div class="category-diff ${diff.cssClass}">${diff.text}</div>
+      </div>
     `;
     listEl.appendChild(item);
   });
