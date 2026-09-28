@@ -80,7 +80,18 @@
       <h1>設定</h1>
     </header>
     <div class="page-content">
-      <p class="placeholder">設定機能はフェーズ5で実装します</p>
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <h2>固定費設定</h2>
+          <button id="add-recurring-btn" class="add-btn">+ 追加</button>
+        </div>
+        <p class="settings-hint">毎日・毎週・毎月の定期支出を自動で記録します。登録日以降の該当日に自動追加されます。</p>
+        <div id="recurring-list" class="recurring-list"></div>
+      </div>
+      <div class="settings-section">
+        <h2>データ管理</h2>
+        <p class="placeholder-small">CSVエクスポート・インポートは今後実装予定</p>
+      </div>
     </div>
   </section>
 
@@ -148,6 +159,63 @@
           </label>
         </form>
         <button type="button" id="form-delete-btn" class="delete-btn" style="display:none;">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 固定費追加/編集モーダル -->
+  <div id="recurring-modal" class="modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <button id="recurring-back-btn" class="back-btn">◀ 戻る</button>
+        <h2 id="recurring-title">固定費を追加</h2>
+        <button type="button" id="recurring-save-btn" class="save-btn">保存</button>
+      </div>
+      <div class="modal-body">
+        <form id="recurring-form">
+          <label>
+            周期
+            <div class="frequency-tabs">
+              <button type="button" class="freq-btn active" data-freq="monthly">毎月</button>
+              <button type="button" class="freq-btn" data-freq="weekly">毎週</button>
+              <button type="button" class="freq-btn" data-freq="weekday">平日</button>
+              <button type="button" class="freq-btn" data-freq="daily">毎日</button>
+            </div>
+          </label>
+          <label id="day-of-month-label">
+            日付
+            <select id="day-of-month-select">
+              <!-- JSで生成 -->
+            </select>
+          </label>
+          <label id="day-of-week-label" style="display:none;">
+            曜日
+            <select id="day-of-week-select">
+              <option value="0">日曜日</option>
+              <option value="1">月曜日</option>
+              <option value="2">火曜日</option>
+              <option value="3">水曜日</option>
+              <option value="4">木曜日</option>
+              <option value="5">金曜日</option>
+              <option value="6">土曜日</option>
+            </select>
+          </label>
+          <label>
+            名前（小カテゴリ）
+            <input type="text" id="recurring-name-input" required placeholder="家賃、Netflix、ジム 等" maxlength="20">
+          </label>
+          <label>
+            金額
+            <input type="number" id="recurring-amount-input" min="1" max="99999999" required inputmode="numeric" placeholder="0">
+            <span class="unit">円</span>
+          </label>
+          <label>
+            メモ
+            <input type="text" id="recurring-memo-input" placeholder="任意" maxlength="30">
+          </label>
+        </form>
+        <button type="button" id="recurring-delete-btn" class="delete-btn" style="display:none;">削除</button>
       </div>
     </div>
   </div>

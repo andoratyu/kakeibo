@@ -2,15 +2,15 @@
 // 家計簿アプリのデータ永続化層
 
 const DB_NAME = 'kakeibo_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v1 → v2: recurring_transactions ストア追加
 
 const STORES = {
   transactions: 'transactions',
   categories: 'categories',
   settings: 'settings',
+  recurring: 'recurring_transactions',
 };
 
-// デフォルトカテゴリ（初回起動時に投入）
 const DEFAULT_CATEGORIES = [
   '食費',
   '交通費',
@@ -21,10 +21,6 @@ const DEFAULT_CATEGORIES = [
   'その他',
 ];
 
-/**
- * DBを開く（初回はスキーマ作成）
- * @returns {Promise<IDBDatabase>}
- */
 function openDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -32,34 +28,32 @@ function openDB() {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
 
-    // 初回起動 or バージョンアップ時
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
 
-      // transactions ストア
       if (!db.objectStoreNames.contains(STORES.transactions)) {
         const tx = db.createObjectStore(STORES.transactions, { keyPath: 'id' });
         tx.createIndex('by_date', 'date', { unique: false });
         tx.createIndex('by_category', 'category_id', { unique: false });
       }
 
-      // categories ストア
       if (!db.objectStoreNames.contains(STORES.categories)) {
         const cat = db.createObjectStore(STORES.categories, { keyPath: 'id' });
         cat.createIndex('by_parent', 'parent_id', { unique: false });
       }
 
-      // settings ストア
       if (!db.objectStoreNames.contains(STORES.settings)) {
         db.createObjectStore(STORES.settings, { keyPath: 'key' });
+      }
+
+      // v2で追加: 固定費テンプレート
+      if (!db.objectStoreNames.contains(STORES.recurring)) {
+        db.createObjectStore(STORES.recurring, { keyPath: 'id' });
       }
     };
   });
 }
 
-/**
- * 単一レコード取得
- */
 function get(storeName, key) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -72,9 +66,6 @@ function get(storeName, key) {
   });
 }
 
-/**
- * 全レコード取得
- */
 function getAll(storeName) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -87,9 +78,6 @@ function getAll(storeName) {
   });
 }
 
-/**
- * インデックスで検索
- */
 function getByIndex(storeName, indexName, value) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -103,9 +91,6 @@ function getByIndex(storeName, indexName, value) {
   });
 }
 
-/**
- * 範囲検索（例: 日付範囲）
- */
 function getByRange(storeName, indexName, lower, upper) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -120,9 +105,6 @@ function getByRange(storeName, indexName, lower, upper) {
   });
 }
 
-/**
- * 追加
- */
 function add(storeName, record) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -135,9 +117,6 @@ function add(storeName, record) {
   });
 }
 
-/**
- * 更新（存在すれば置換、なければ追加）
- */
 function put(storeName, record) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -150,9 +129,6 @@ function put(storeName, record) {
   });
 }
 
-/**
- * 削除
- */
 function remove(storeName, key) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -165,9 +141,6 @@ function remove(storeName, key) {
   });
 }
 
-/**
- * ストア全削除
- */
 function clear(storeName) {
   return openDB().then((db) => {
     return new Promise((resolve, reject) => {
@@ -180,18 +153,12 @@ function clear(storeName) {
   });
 }
 
-// ─── 家計簿アプリ用の高レベルAPI ───
+// ─── 高レベルAPI ───
 
-/**
- * UUID生成
- */
 function generateId() {
   return crypto.randomUUID();
 }
 
-/**
- * 現在時刻（ISO8601、JST）
- */
 function now() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, '0');
@@ -204,12 +171,9 @@ function now() {
   return `${y}-${m}-${day}T${h}:${mi}:${s}+09:00`;
 }
 
-/**
- * デフォルトカテゴリを投入（初回起動時のみ）
- */
 async function initDefaultCategories() {
   const existing = await getAll(STORES.categories);
-  if (existing.length > 0) return; // 既にある場合は何もしない
+  if (existing.length > 0) return;
 
   const promises = DEFAULT_CATEGORIES.map((name, index) => {
     return add(STORES.categories, {
@@ -225,9 +189,6 @@ async function initDefaultCategories() {
   console.log('デフォルトカテゴリを投入しました');
 }
 
-/**
- * 支出記録を追加
- */
 async function addTransaction({ date, category_id, amount, memo = '' }) {
   const record = {
     id: generateId(),
@@ -240,30 +201,18 @@ async function addTransaction({ date, category_id, amount, memo = '' }) {
   return await add(STORES.transactions, record);
 }
 
-/**
- * 支出記録を更新
- */
 async function updateTransaction(record) {
   return await put(STORES.transactions, record);
 }
 
-/**
- * 支出記録を削除
- */
 async function deleteTransaction(id) {
   return await remove(STORES.transactions, id);
 }
 
-/**
- * 指定期間の支出記録を取得
- */
 async function getTransactionsByPeriod(startDate, endDate) {
   return await getByRange(STORES.transactions, 'by_date', startDate, endDate);
 }
 
-/**
- * カテゴリを追加
- */
 async function addCategory({ name, parent_id = null }) {
   const existing = await getAll(STORES.categories);
   const order = existing.length + 1;
@@ -277,30 +226,53 @@ async function addCategory({ name, parent_id = null }) {
   return await add(STORES.categories, record);
 }
 
-/**
- * カテゴリ全取得（階層情報付き）
- */
 async function getAllCategories() {
   return await getAll(STORES.categories);
 }
 
-/**
- * カテゴリ削除
- */
 async function deleteCategory(id) {
   return await remove(STORES.categories, id);
 }
 
-/**
- * 全データ削除（設定画面の「全データ削除」用）
- */
+// ─── 固定費テンプレート ───
+
+async function addRecurring({ frequency, day_of_month, day_of_week, category_id, amount, memo, start_date }) {
+  const record = {
+    id: generateId(),
+    frequency,
+    day_of_month: day_of_month ?? null,
+    day_of_week: day_of_week ?? null,
+    category_id,
+    amount: parseInt(amount, 10),
+    memo: memo || '',
+    start_date,
+    last_generated_date: null, // 初回はまだ未生成
+    created_at: now(),
+    updated_at: now(),
+  };
+  return await add(STORES.recurring, record);
+}
+
+async function updateRecurring(record) {
+  record.updated_at = now();
+  return await put(STORES.recurring, record);
+}
+
+async function deleteRecurring(id) {
+  return await remove(STORES.recurring, id);
+}
+
+async function getAllRecurring() {
+  return await getAll(STORES.recurring);
+}
+
 async function clearAllData() {
   await clear(STORES.transactions);
   await clear(STORES.categories);
   await clear(STORES.settings);
+  await clear(STORES.recurring);
 }
 
-// エクスポート（グローバルに公開）
 window.KakeiboDB = {
   openDB,
   initDefaultCategories,
@@ -311,8 +283,11 @@ window.KakeiboDB = {
   addCategory,
   getAllCategories,
   deleteCategory,
+  addRecurring,
+  updateRecurring,
+  deleteRecurring,
+  getAllRecurring,
   clearAllData,
-  // 低レベルAPIも公開（デバッグ用）
   get,
   getAll,
   getByIndex,
