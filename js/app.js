@@ -56,18 +56,15 @@ function getMonthRange(year, month) {
   return { startDate, endDate, lastDay };
 }
 
-/**
- * カレンダーマス用のフォントサイズを動的に決める（より小さめに）
- */
 function getAmountFontSize(amount) {
   const text = `${amount.toLocaleString()}円`;
   const len = text.length;
-  if (len <= 4) return '12px';   // 999円 (4文字)
-  if (len <= 5) return '11px';   // 5000円
-  if (len <= 6) return '10px';   // 5,000円
-  if (len <= 7) return '9px';    // 10,000円
-  if (len <= 8) return '8px';    // 100,000円
-  return '7px';                  // 1,000,000円以上
+  if (len <= 4) return '12px';
+  if (len <= 5) return '11px';
+  if (len <= 6) return '10px';
+  if (len <= 7) return '9px';
+  if (len <= 8) return '8px';
+  return '7px';
 }
 
 function setupTabNavigation() {
@@ -252,10 +249,12 @@ async function renderHome() {
 
   const emptyEl = document.getElementById('home-empty');
   const canvasEl = document.getElementById('home-chart');
+  const listEl = document.getElementById('home-category-list');
 
   if (transactions.length === 0) {
     emptyEl.style.display = 'block';
     canvasEl.style.display = 'none';
+    listEl.innerHTML = '';
     if (state.homeChart) {
       state.homeChart.destroy();
       state.homeChart = null;
@@ -288,10 +287,6 @@ async function renderHome() {
     state.homeChart.destroy();
   }
 
-  const isMobile = window.innerWidth < 600;
-  // 円が切れないように十分なpadding
-  const padding = isMobile ? 70 : 90;
-
   const ctx = canvasEl.getContext('2d');
   state.homeChart = new Chart(ctx, {
     type: 'pie',
@@ -300,20 +295,14 @@ async function renderHome() {
       datasets: [{
         data: values,
         backgroundColor: colors,
-        borderColor: '#ffffff',
-        borderWidth: 2,
+        borderWidth: 0,  // 白い区切り線をなくす
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: true,
       layout: {
-        padding: {
-          top: padding,
-          right: padding,
-          bottom: padding,
-          left: padding,
-        },
+        padding: 4,  // 引き出し線なくしたので最小限
       },
       plugins: {
         legend: {
@@ -339,11 +328,11 @@ async function renderHome() {
         const meta = chart.getDatasetMeta(0);
         const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
 
-        // 大きい扇（8%以上）: 扇内にラベル
+        // 10%以上のカテゴリのみ扇内にラベル表示
         meta.data.forEach((arc, i) => {
           const value = data.datasets[0].data[i];
           const percent = (value / total) * 100;
-          if (percent < 8) return;
+          if (percent < 10) return;
 
           const label = data.labels[i];
           const { x, y, startAngle, endAngle, outerRadius, innerRadius } = arc.getProps(
@@ -361,84 +350,50 @@ async function renderHome() {
 
           ctx.save();
           ctx.fillStyle = textColor;
-          ctx.font = 'bold 15px sans-serif';
+          ctx.font = 'bold 16px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(`${label} ${percent.toFixed(0)}%`, labelX, labelY);
           ctx.restore();
         });
-
-        // 小さい扇（8%未満）: 引き出し線で外に、円周から短く
-        const smallLabels = [];
-        meta.data.forEach((arc, i) => {
-          const value = data.datasets[0].data[i];
-          const percent = (value / total) * 100;
-          if (percent >= 8) return;
-
-          const { x, y, startAngle, endAngle, outerRadius } = arc.getProps(
-            ['x', 'y', 'startAngle', 'endAngle', 'outerRadius'],
-            true
-          );
-          const midAngle = (startAngle + endAngle) / 2;
-          const startX = x + Math.cos(midAngle) * outerRadius;
-          const startY = y + Math.sin(midAngle) * outerRadius;
-          const isRight = Math.cos(midAngle) >= 0;
-
-          // 円周から短い折れ点（8px外）
-          const bendX = x + Math.cos(midAngle) * (outerRadius + 8);
-          const bendY = y + Math.sin(midAngle) * (outerRadius + 8);
-
-          // 水平線終端: 折れ点から水平方向にわずかに（20pxだけ）
-          const endX = isRight ? bendX + 20 : bendX - 20;
-          const endY = bendY;
-
-          smallLabels.push({
-            label: data.labels[i],
-            percent,
-            startX, startY,
-            bendX, bendY,
-            endX, endY,
-            isRight,
-          });
-        });
-
-        const rightLabels = smallLabels.filter(l => l.isRight).sort((a, b) => a.endY - b.endY);
-        const leftLabels = smallLabels.filter(l => !l.isRight).sort((a, b) => a.endY - b.endY);
-
-        adjustLabelYPositions(rightLabels, 20);
-        adjustLabelYPositions(leftLabels, 20);
-
-        [...rightLabels, ...leftLabels].forEach(l => {
-          ctx.save();
-          ctx.strokeStyle = '#666666';
-          ctx.lineWidth = 1;
-          ctx.beginPath();
-          ctx.moveTo(l.startX, l.startY);
-          ctx.lineTo(l.bendX, l.bendY);
-          ctx.lineTo(l.endX, l.endY);
-          ctx.stroke();
-
-          ctx.fillStyle = '#333333';
-          ctx.font = 'bold 12px sans-serif';
-          ctx.textAlign = l.isRight ? 'left' : 'right';
-          ctx.textBaseline = 'middle';
-          const textOffsetX = l.isRight ? 4 : -4;
-          ctx.fillText(`${l.label} ${l.percent.toFixed(0)}%`, l.endX + textOffsetX, l.endY);
-          ctx.restore();
-        });
       },
     }],
   });
+
+  // カテゴリ一覧を描画
+  renderCategoryList(sortedEntries, catMap, colors, monthTotal);
 }
 
-function adjustLabelYPositions(labels, minSpacing) {
-  for (let i = 1; i < labels.length; i++) {
-    const prev = labels[i - 1];
-    const curr = labels[i];
-    if (curr.endY - prev.endY < minSpacing) {
-      curr.endY = prev.endY + minSpacing;
-    }
-  }
+function renderCategoryList(sortedEntries, catMap, colors, monthTotal) {
+  const listEl = document.getElementById('home-category-list');
+  listEl.innerHTML = '';
+
+  // 合計行
+  const totalItem = document.createElement('div');
+  totalItem.className = 'category-list-item total';
+  totalItem.innerHTML = `
+    <div class="category-list-left">
+      <span class="category-name">合計</span>
+    </div>
+    <span class="category-amount">${monthTotal.toLocaleString()}円</span>
+  `;
+  listEl.appendChild(totalItem);
+
+  // 各カテゴリ
+  sortedEntries.forEach(([id, amount], i) => {
+    const name = catMap[id]?.name || '(不明)';
+    const color = colors[i];
+    const item = document.createElement('div');
+    item.className = 'category-list-item';
+    item.innerHTML = `
+      <div class="category-list-left">
+        <span class="category-color-mark" style="background-color: ${color};"></span>
+        <span class="category-name">${escapeHtml(name)}</span>
+      </div>
+      <span class="category-amount">${amount.toLocaleString()}円</span>
+    `;
+    listEl.appendChild(item);
+  });
 }
 
 function generateGrayscaleColors(n) {

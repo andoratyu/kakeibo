@@ -1,6 +1,6 @@
 // Service Worker
 
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v12';
 const CACHE_NAME = `kakeibo-${CACHE_VERSION}`;
 
 const urlsToCache = [

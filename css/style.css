@@ -132,7 +132,7 @@ header h1 {
 
 .home-total {
   text-align: center;
-  padding: 16px 16px 4px;
+  padding: 16px 16px 8px;
 }
 
 .home-total-amount {
@@ -143,16 +143,63 @@ header h1 {
 
 .chart-container {
   position: relative;
-  width: 100%;
-  max-width: 500px;
+  width: 90%;
+  max-width: 400px;
   margin: 0 auto;
-  padding: 4px;
   aspect-ratio: 1 / 1;
 }
 
 #home-chart {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* カテゴリ一覧 */
+.category-list {
+  margin: 16px 8px 0;
+  border-top: 1px solid #e0e0e0;
+}
+
+.category-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 8px;
+  border-bottom: 1px solid #e0e0e0;
+  gap: 12px;
+}
+
+.category-list-item.total {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.category-list-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.category-color-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.category-name {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-amount {
+  font-size: 15px;
+  font-weight: bold;
+  white-space: nowrap;
 }
 
 /* ─── カレンダー ─── */
